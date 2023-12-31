@@ -1,0 +1,15 @@
+# C Build
+*.o
+
+# Kernel module
+*.ko
+*.mod.c
+*.ko.cmd
+*.mod.o.cmd
+*.o.cmd
+.cache.mk
+*.mod
+Module.symvers
+modules.order
+
+.mypy_cache
