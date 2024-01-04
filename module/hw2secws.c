@@ -42,9 +42,17 @@ ssize_t forward_pkts_count_show(struct device *dev, struct device_attribute *att
     return scnprintf(buf, PAGE_SIZE, "%u\n", forward_pkts_count);
 }
 
+ssize_t reset_counters_store(struct device *dev, struct device_attribute *attr,
+                             const char *buf, size_t count) {
+    input_pkts_count = 0;
+    forward_pkts_count = 0;
+    return count;
+}
+
 static struct device *sysfs_device;
 static DEVICE_ATTR(input_pkts_count, S_IRUGO, input_pkts_count_show, NULL);
 static DEVICE_ATTR(forward_pkts_count, S_IRUGO, forward_pkts_count_show, NULL);
+static DEVICE_ATTR(reset_counters, S_IWUSR, NULL, reset_counters_store);
 
 static int __init init(void) {
     int ret;
@@ -97,11 +105,22 @@ static int __init init(void) {
         return -1;
     }
 
+    if (device_create_file(sysfs_device, (const struct device_attribute *) &dev_attr_reset_counters.attr)) {
+        nf_unregister_net_hooks(&init_net, hooks, 2);
+        device_remove_file(sysfs_device, (const struct device_attribute *) &dev_attr_forward_pkts_count.attr);
+        device_remove_file(sysfs_device, (const struct device_attribute *) &dev_attr_input_pkts_count.attr);
+        device_destroy(sysfs_class, MKDEV(major, 0));
+        class_destroy(sysfs_class);
+        unregister_chrdev(major, MOD_NAME);
+        return -1;
+    }
+
     return ret;
 }
 
 static void __exit exit(void) {
     nf_unregister_net_hooks(&init_net, hooks, 2);
+    device_remove_file(sysfs_device, (const struct device_attribute *) &dev_attr_reset_counters.attr);
     device_remove_file(sysfs_device, (const struct device_attribute *) &dev_attr_forward_pkts_count.attr);
     device_remove_file(sysfs_device, (const struct device_attribute *) &dev_attr_input_pkts_count.attr);
     device_destroy(sysfs_class, MKDEV(major, 0));
