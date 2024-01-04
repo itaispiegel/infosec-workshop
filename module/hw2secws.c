@@ -3,7 +3,7 @@
 #include <linux/netfilter.h>
 #include <linux/device.h>
 
-#define MOD_NAME "hw1secws"
+#define MOD_NAME "hw2secws"
 
 static unsigned int input_pkts_count = 0;
 static unsigned int forward_pkts_count = 0;
@@ -49,7 +49,7 @@ static DEVICE_ATTR(forward_pkts_count, S_IRUGO, forward_pkts_count_show, NULL);
 static int __init init(void) {
     int ret;
 
-    printk(KERN_INFO "Starting hw1secws kernel module\n");
+    printk(KERN_INFO "Starting hw2secws kernel module\n");
     ret = nf_register_net_hooks(&init_net, hooks, 2);
     if (ret > 0) {
         printk(KERN_ERR "Failed to register net hooks\n");
@@ -107,7 +107,7 @@ static void __exit exit(void) {
     device_destroy(sysfs_class, MKDEV(major, 0));
     class_destroy(sysfs_class);
     unregister_chrdev(major, MOD_NAME);
-    printk(KERN_INFO "Exiting hw1secws kernel module\n");
+    printk(KERN_INFO "Exiting hw2secws kernel module\n");
 }
 
 module_init(init);
