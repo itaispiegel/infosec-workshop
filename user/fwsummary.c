@@ -22,6 +22,14 @@ unsigned int read_unsigned_int_from_file(const char *filename) {
     return value;
 }
 
+unsigned int get_input_pkts_count() {
+    return read_unsigned_int_from_file(ACCEPTED_PKTS_COUNT_FILENAME);
+}
+
+unsigned int get_dropped_pkts_count() {
+    return read_unsigned_int_from_file(DROPPED_PKTS_COUNT_FILENAME);
+}
+
 void reset_counters() {
     FILE *fp;
 
@@ -32,14 +40,6 @@ void reset_counters() {
 
     fprintf(fp, "1");
     fclose(fp);
-}
-
-unsigned int get_input_pkts_count() {
-    return read_unsigned_int_from_file(ACCEPTED_PKTS_COUNT_FILENAME);
-}
-
-unsigned int get_dropped_pkts_count() {
-    return read_unsigned_int_from_file(DROPPED_PKTS_COUNT_FILENAME);
 }
 
 int main(int argc, char **argv) {
