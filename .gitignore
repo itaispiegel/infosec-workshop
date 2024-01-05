@@ -13,3 +13,5 @@ Module.symvers
 modules.order
 
 .mypy_cache
+
+user/fwsummary

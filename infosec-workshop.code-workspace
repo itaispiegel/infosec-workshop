@@ -1,0 +1,22 @@
+{
+    "folders": [
+        {
+            "path": "."
+        },
+        {
+            "path": "module"
+        },
+        {
+            "path": "user"
+        }
+    ],
+    "settings": {
+        "files.exclude": {
+            "module": true,
+            "user": true
+        },
+        "files.associations": {
+            "*.h": "c",
+        }
+    }
+}
