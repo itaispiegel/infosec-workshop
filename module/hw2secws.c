@@ -5,20 +5,20 @@
 
 #define MOD_NAME "hw2secws"
 
-static unsigned int input_pkts_count = 0;
-static unsigned int forward_pkts_count = 0;
+static unsigned int accepted_pkts_count = 0;
+static unsigned int dropped_pkts_count = 0;
 
 static unsigned int forward_hook_fn(void *priv, struct sk_buff *skb,
                                     const struct nf_hook_state *state) {
     printk(KERN_INFO "Packet Dropped\n");
-    ++forward_pkts_count;
+    ++dropped_pkts_count;
     return NF_DROP;
 }
 
 static unsigned int input_hook_fn(void *priv, struct sk_buff *skb,
                                   const struct nf_hook_state *state) {
     printk(KERN_INFO "Packet Accepted\n");
-    ++input_pkts_count;
+    ++accepted_pkts_count;
     return NF_ACCEPT;
 }
 
@@ -32,26 +32,27 @@ static struct file_operations fops = {
     .owner = THIS_MODULE,
 };
 
-ssize_t input_pkts_count_show(struct device *dev, struct device_attribute *attr,
-                              char *buf) {
-    return scnprintf(buf, PAGE_SIZE, "%u\n", input_pkts_count);
+ssize_t accepted_pkts_count_show(struct device *dev,
+                                 struct device_attribute *attr, char *buf) {
+    return scnprintf(buf, PAGE_SIZE, "%u\n", accepted_pkts_count);
 }
 
-ssize_t forward_pkts_count_show(struct device *dev,
+ssize_t dropped_pkts_count_show(struct device *dev,
                                 struct device_attribute *attr, char *buf) {
-    return scnprintf(buf, PAGE_SIZE, "%u\n", forward_pkts_count);
+    return scnprintf(buf, PAGE_SIZE, "%u\n", dropped_pkts_count);
 }
 
 ssize_t reset_counters_store(struct device *dev, struct device_attribute *attr,
                              const char *buf, size_t count) {
-    input_pkts_count = 0;
-    forward_pkts_count = 0;
+    accepted_pkts_count = 0;
+    dropped_pkts_count = 0;
     return count;
 }
 
 static struct device *sysfs_device;
-static DEVICE_ATTR(input_pkts_count, S_IRUGO, input_pkts_count_show, NULL);
-static DEVICE_ATTR(forward_pkts_count, S_IRUGO, forward_pkts_count_show, NULL);
+static DEVICE_ATTR(accepted_pkts_count, S_IRUGO, accepted_pkts_count_show,
+                   NULL);
+static DEVICE_ATTR(dropped_pkts_count, S_IRUGO, dropped_pkts_count_show, NULL);
 static DEVICE_ATTR(reset_counters, S_IWUSR, NULL, reset_counters_store);
 
 static int __init init(void) {
@@ -88,40 +89,40 @@ static int __init init(void) {
     }
     printk(KERN_INFO "Successfully created sysfs device\n");
 
-    if (device_create_file(
-            sysfs_device,
-            (const struct device_attribute *)&dev_attr_input_pkts_count.attr)) {
+    if (device_create_file(sysfs_device,
+                           (const struct device_attribute
+                                *)&dev_attr_accepted_pkts_count.attr)) {
         device_destroy(sysfs_class, MKDEV(major, 0));
         class_destroy(sysfs_class);
         unregister_chrdev(major, MOD_NAME);
         nf_unregister_net_hooks(&init_net, hooks, 2);
         return -1;
     }
-    printk(KERN_INFO "Successfully created sysfs input_pkts_count\n");
+    printk(KERN_INFO "Successfully created sysfs accepted_pkts_count\n");
 
     if (device_create_file(sysfs_device,
                            (const struct device_attribute
-                                *)&dev_attr_forward_pkts_count.attr)) {
-        device_remove_file(
-            sysfs_device,
-            (const struct device_attribute *)&dev_attr_input_pkts_count.attr);
+                                *)&dev_attr_dropped_pkts_count.attr)) {
+        device_remove_file(sysfs_device,
+                           (const struct device_attribute
+                                *)&dev_attr_accepted_pkts_count.attr);
         device_destroy(sysfs_class, MKDEV(major, 0));
         class_destroy(sysfs_class);
         unregister_chrdev(major, MOD_NAME);
         nf_unregister_net_hooks(&init_net, hooks, 2);
         return -1;
     }
-    printk(KERN_INFO "Successfully created sysfs forward_pkts_count\n");
+    printk(KERN_INFO "Successfully created sysfs dropped_pkts_count\n");
 
     if (device_create_file(
             sysfs_device,
             (const struct device_attribute *)&dev_attr_reset_counters.attr)) {
         device_remove_file(
             sysfs_device,
-            (const struct device_attribute *)&dev_attr_forward_pkts_count.attr);
-        device_remove_file(
-            sysfs_device,
-            (const struct device_attribute *)&dev_attr_input_pkts_count.attr);
+            (const struct device_attribute *)&dev_attr_dropped_pkts_count.attr);
+        device_remove_file(sysfs_device,
+                           (const struct device_attribute
+                                *)&dev_attr_accepted_pkts_count.attr);
         device_destroy(sysfs_class, MKDEV(major, 0));
         class_destroy(sysfs_class);
         unregister_chrdev(major, MOD_NAME);
@@ -139,10 +140,10 @@ static void __exit exit(void) {
         (const struct device_attribute *)&dev_attr_reset_counters.attr);
     device_remove_file(
         sysfs_device,
-        (const struct device_attribute *)&dev_attr_forward_pkts_count.attr);
+        (const struct device_attribute *)&dev_attr_dropped_pkts_count.attr);
     device_remove_file(
         sysfs_device,
-        (const struct device_attribute *)&dev_attr_input_pkts_count.attr);
+        (const struct device_attribute *)&dev_attr_accepted_pkts_count.attr);
     device_destroy(sysfs_class, MKDEV(major, 0));
     class_destroy(sysfs_class);
     unregister_chrdev(major, MOD_NAME);
