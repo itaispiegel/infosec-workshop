@@ -2,7 +2,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define SYSFS_BASE_PATH "/sys/class/hw2secws/hw2secws/"
+#define MODULE_NAME "hw2secws"
+#define SYSFS_BASE_PATH "/sys/class/" MODULE_NAME "/" MODULE_NAME "/"
 #define ACCEPTED_PKTS_COUNT_FILENAME SYSFS_BASE_PATH "accepted_pkts_count"
 #define DROPPED_PKTS_COUNT_FILENAME SYSFS_BASE_PATH "dropped_pkts_count"
 #define RESET_COUNTERS_FILENAME SYSFS_BASE_PATH "reset_counters"
