@@ -1,7 +1,7 @@
+#include <linux/device.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/netfilter.h>
-#include <linux/device.h>
 
 #define MOD_NAME "hw2secws"
 
@@ -37,8 +37,8 @@ ssize_t input_pkts_count_show(struct device *dev, struct device_attribute *attr,
     return scnprintf(buf, PAGE_SIZE, "%u\n", input_pkts_count);
 }
 
-ssize_t forward_pkts_count_show(struct device *dev, struct device_attribute *attr,
-                              char *buf) {
+ssize_t forward_pkts_count_show(struct device *dev,
+                                struct device_attribute *attr, char *buf) {
     return scnprintf(buf, PAGE_SIZE, "%u\n", forward_pkts_count);
 }
 
@@ -55,15 +55,11 @@ static DEVICE_ATTR(forward_pkts_count, S_IRUGO, forward_pkts_count_show, NULL);
 static DEVICE_ATTR(reset_counters, S_IWUSR, NULL, reset_counters_store);
 
 static int __init init(void) {
-    int ret;
-
-    printk(KERN_INFO "Starting hw2secws kernel module\n");
-    ret = nf_register_net_hooks(&init_net, hooks, 2);
-    if (ret > 0) {
+    if (nf_register_net_hooks(&init_net, hooks, 2)) {
         printk(KERN_ERR "Failed to register net hooks\n");
-    } else {
-        printk(KERN_INFO "Successfully registered net hooks\n");
+        return -1;
     }
+    printk(KERN_INFO "Successfully registered net hooks\n");
 
     major = register_chrdev(0, MOD_NAME, &fops);
     if (major < 0) {
@@ -71,61 +67,86 @@ static int __init init(void) {
         nf_unregister_net_hooks(&init_net, hooks, 2);
         return -1;
     }
+    printk(KERN_INFO "Successfully registered chrdev\n");
 
     sysfs_class = class_create(THIS_MODULE, MOD_NAME);
     if (IS_ERR(sysfs_class)) {
         printk(KERN_ERR "Failed to create sysfs class\n");
-        nf_unregister_net_hooks(&init_net, hooks, 2);
         unregister_chrdev(major, MOD_NAME);
+        nf_unregister_net_hooks(&init_net, hooks, 2);
         return -1;
     }
+    printk(KERN_INFO "Successfully created sysfs class\n");
 
-    sysfs_device = device_create(sysfs_class, NULL, MKDEV(major, 0), NULL, MOD_NAME);
+    sysfs_device =
+        device_create(sysfs_class, NULL, MKDEV(major, 0), NULL, MOD_NAME);
     if (IS_ERR(sysfs_device)) {
-        nf_unregister_net_hooks(&init_net, hooks, 2);
         class_destroy(sysfs_class);
         unregister_chrdev(major, MOD_NAME);
+        nf_unregister_net_hooks(&init_net, hooks, 2);
         return -1;
     }
+    printk(KERN_INFO "Successfully created sysfs device\n");
 
-    if (device_create_file(sysfs_device, (const struct device_attribute *) &dev_attr_input_pkts_count.attr)) {
-        nf_unregister_net_hooks(&init_net, hooks, 2);
+    if (device_create_file(
+            sysfs_device,
+            (const struct device_attribute *)&dev_attr_input_pkts_count.attr)) {
         device_destroy(sysfs_class, MKDEV(major, 0));
         class_destroy(sysfs_class);
         unregister_chrdev(major, MOD_NAME);
+        nf_unregister_net_hooks(&init_net, hooks, 2);
         return -1;
     }
+    printk(KERN_INFO "Successfully created sysfs input_pkts_count\n");
 
-    if (device_create_file(sysfs_device, (const struct device_attribute *) &dev_attr_forward_pkts_count.attr)) {
-        nf_unregister_net_hooks(&init_net, hooks, 2);
-        device_remove_file(sysfs_device, (const struct device_attribute *) &dev_attr_input_pkts_count.attr);
+    if (device_create_file(sysfs_device,
+                           (const struct device_attribute
+                                *)&dev_attr_forward_pkts_count.attr)) {
+        device_remove_file(
+            sysfs_device,
+            (const struct device_attribute *)&dev_attr_input_pkts_count.attr);
         device_destroy(sysfs_class, MKDEV(major, 0));
         class_destroy(sysfs_class);
         unregister_chrdev(major, MOD_NAME);
+        nf_unregister_net_hooks(&init_net, hooks, 2);
         return -1;
     }
+    printk(KERN_INFO "Successfully created sysfs forward_pkts_count\n");
 
-    if (device_create_file(sysfs_device, (const struct device_attribute *) &dev_attr_reset_counters.attr)) {
-        nf_unregister_net_hooks(&init_net, hooks, 2);
-        device_remove_file(sysfs_device, (const struct device_attribute *) &dev_attr_forward_pkts_count.attr);
-        device_remove_file(sysfs_device, (const struct device_attribute *) &dev_attr_input_pkts_count.attr);
+    if (device_create_file(
+            sysfs_device,
+            (const struct device_attribute *)&dev_attr_reset_counters.attr)) {
+        device_remove_file(
+            sysfs_device,
+            (const struct device_attribute *)&dev_attr_forward_pkts_count.attr);
+        device_remove_file(
+            sysfs_device,
+            (const struct device_attribute *)&dev_attr_input_pkts_count.attr);
         device_destroy(sysfs_class, MKDEV(major, 0));
         class_destroy(sysfs_class);
         unregister_chrdev(major, MOD_NAME);
+        nf_unregister_net_hooks(&init_net, hooks, 2);
         return -1;
     }
+    printk(KERN_INFO "Successfully created sysfs reset_counters\n");
 
-    return ret;
+    return 0;
 }
 
 static void __exit exit(void) {
-    nf_unregister_net_hooks(&init_net, hooks, 2);
-    device_remove_file(sysfs_device, (const struct device_attribute *) &dev_attr_reset_counters.attr);
-    device_remove_file(sysfs_device, (const struct device_attribute *) &dev_attr_forward_pkts_count.attr);
-    device_remove_file(sysfs_device, (const struct device_attribute *) &dev_attr_input_pkts_count.attr);
+    device_remove_file(
+        sysfs_device,
+        (const struct device_attribute *)&dev_attr_reset_counters.attr);
+    device_remove_file(
+        sysfs_device,
+        (const struct device_attribute *)&dev_attr_forward_pkts_count.attr);
+    device_remove_file(
+        sysfs_device,
+        (const struct device_attribute *)&dev_attr_input_pkts_count.attr);
     device_destroy(sysfs_class, MKDEV(major, 0));
     class_destroy(sysfs_class);
     unregister_chrdev(major, MOD_NAME);
+    nf_unregister_net_hooks(&init_net, hooks, 2);
     printk(KERN_INFO "Exiting hw2secws kernel module\n");
 }
 
