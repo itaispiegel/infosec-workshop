@@ -49,19 +49,19 @@ typedef enum {
 typedef enum {
     MINOR_RULES = 0,
     MINOR_LOG = 1,
-} minor_t;
+} __attribute__((packed)) minor_t;
 
 typedef enum {
     ACK_NO = 0x01,
     ACK_YES = 0x02,
     ACK_ANY = ACK_NO | ACK_YES,
-} ack_t;
+} __attribute__((packed)) ack_t;
 
 typedef enum {
     DIRECTION_IN = 0x01,
     DIRECTION_OUT = 0x02,
     DIRECTION_ANY = DIRECTION_IN | DIRECTION_OUT,
-} direction_t;
+} __attribute__((packed)) direction_t;
 
 // rule base
 typedef struct {
@@ -82,7 +82,7 @@ typedef struct {
     __u8 protocol;   // values from: prot_t
     ack_t ack;       // values from: ack_t
     __u8 action;     // valid values: NF_ACCEPT, NF_DROP
-} rule_t;
+} __attribute__((packed)) rule_t;
 
 // logging
 typedef struct {
