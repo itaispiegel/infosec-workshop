@@ -10,10 +10,10 @@ import (
 var showCmd = &cobra.Command{
 	Use:   "show_rules",
 	Short: "Show the firewall rules",
-	RunE:  execute,
+	RunE:  executeShowRules,
 }
 
-func execute(cmd *cobra.Command, args []string) error {
+func executeShowRules(cmd *cobra.Command, args []string) error {
 	table, err := rulestable.ReadRules()
 	if err != nil {
 		return err

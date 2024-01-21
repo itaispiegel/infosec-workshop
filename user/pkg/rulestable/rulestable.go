@@ -12,8 +12,12 @@ const (
 )
 
 // Adds a rule to the firewall rule table.
-func AddRule(rule rules.Rule) error {
-	buf := rule.Marshal()
+func SaveRules(rules []rules.Rule) error {
+	var buf []byte
+
+	for _, rule := range rules {
+		buf = append(buf, rule.Marshal()...)
+	}
 
 	f, err := os.OpenFile(RuleTableDeviceFile, os.O_WRONLY, 0)
 	if err != nil {
@@ -38,7 +42,7 @@ func ReadRules() ([]rules.Rule, error) {
 
 	table := []rules.Rule{}
 	for i := 0; i < len(buf); i += ruleBytesSize {
-		table = append(table, rules.Unmarshal(buf[i:i+ruleBytesSize]))
+		table = append(table, *rules.Unmarshal(buf[i : i+ruleBytesSize]))
 	}
 
 	return table, nil

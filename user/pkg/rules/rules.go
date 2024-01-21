@@ -50,33 +50,35 @@ type Rule struct {
 func NewRule(
 	name string,
 	direction uint8,
-	srcIp [4]byte,
-	srcPrefixMask [4]byte,
-	srcPrefixSize uint8,
-	dstIp [4]byte,
-	dstPrefixMask [4]byte,
-	dstPrefixSize uint8,
+	srcIp net.IP,
+	srcPrefixMask net.IPMask,
+	dstIp net.IP,
+	dstPrefixMask net.IPMask,
 	srcPort uint16,
 	dstPort uint16,
 	protocol uint8,
 	ack uint8,
-	action uint8) (Rule, error) {
+	action uint8) (*Rule, error) {
+
 	if len(name) > RuleNameSizeLimit {
-		return Rule{}, errors.New("name is too long")
+		return &Rule{}, errors.New("name is too long")
 	}
 
 	nameSlice := [RuleNameSizeLimit]byte{0}
 	copy(nameSlice[:], []byte(name))
 
-	return Rule{
+	srcPrefixMaskSize, _ := srcPrefixMask.Size()
+	dstPrefixMaskSize, _ := dstPrefixMask.Size()
+
+	return &Rule{
 		Name:          nameSlice,
 		Direction:     direction,
-		SrcIp:         srcIp,
-		SrcPrefixMask: srcPrefixMask,
-		SrcPrefixSize: srcPrefixSize,
-		DstIp:         dstIp,
-		DstPrefixMask: dstPrefixMask,
-		DstPrefixSize: dstPrefixSize,
+		SrcIp:         [4]byte(srcIp.To4()),
+		SrcPrefixMask: [4]byte(srcPrefixMask),
+		SrcPrefixSize: uint8(srcPrefixMaskSize),
+		DstIp:         [4]byte(dstIp.To4()),
+		DstPrefixMask: [4]byte(dstPrefixMask),
+		DstPrefixSize: uint8(dstPrefixMaskSize),
 		SrcPort:       srcPort,
 		DstPort:       dstPort,
 		Protocol:      protocol,
@@ -86,7 +88,7 @@ func NewRule(
 }
 
 // Unmarshals a rule from a byte slice.
-func Unmarshal(data []byte) Rule {
+func Unmarshal(data []byte) *Rule {
 	var rule Rule
 	reader := bytes.NewReader(data)
 	binary.Read(reader, binary.LittleEndian, &rule.Name)
@@ -97,12 +99,12 @@ func Unmarshal(data []byte) Rule {
 	binary.Read(reader, binary.BigEndian, &rule.DstIp)
 	binary.Read(reader, binary.BigEndian, &rule.DstPrefixMask)
 	binary.Read(reader, binary.LittleEndian, &rule.DstPrefixSize)
+	binary.Read(reader, binary.LittleEndian, &rule.Protocol)
 	binary.Read(reader, binary.LittleEndian, &rule.SrcPort)
 	binary.Read(reader, binary.LittleEndian, &rule.DstPort)
-	binary.Read(reader, binary.LittleEndian, &rule.Protocol)
 	binary.Read(reader, binary.LittleEndian, &rule.Ack)
 	binary.Read(reader, binary.LittleEndian, &rule.Action)
-	return rule
+	return &rule
 }
 
 // Marshals a rule to a byte slice.
@@ -116,9 +118,9 @@ func (rule *Rule) Marshal() []byte {
 	binary.Write(buf, binary.BigEndian, rule.DstIp)
 	binary.Write(buf, binary.BigEndian, rule.DstPrefixMask)
 	binary.Write(buf, binary.LittleEndian, rule.DstPrefixSize)
+	binary.Write(buf, binary.LittleEndian, rule.Protocol)
 	binary.Write(buf, binary.LittleEndian, rule.SrcPort)
 	binary.Write(buf, binary.LittleEndian, rule.DstPort)
-	binary.Write(buf, binary.LittleEndian, rule.Protocol)
 	binary.Write(buf, binary.LittleEndian, rule.Ack)
 	binary.Write(buf, binary.LittleEndian, rule.Action)
 	return buf.Bytes()
@@ -142,6 +144,19 @@ func (rule *Rule) ToString() string {
 	sb.WriteString(net.IP(rule.SrcIp[:]).String() + "/" + strconv.Itoa(int(rule.SrcPrefixSize)) + " ")
 	sb.WriteString(net.IP(rule.DstIp[:]).String() + "/" + strconv.Itoa(int(rule.DstPrefixSize)) + " ")
 
+	switch rule.Protocol {
+	case ProtIcmp:
+		sb.WriteString("icmp ")
+	case ProtTcp:
+		sb.WriteString("tcp ")
+	case ProtUdp:
+		sb.WriteString("udp ")
+	case ProtOther:
+		sb.WriteString("other ")
+	case ProtAny:
+		sb.WriteString("any ")
+	}
+
 	if rule.SrcPort == 0 {
 		sb.WriteString("any ")
 	} else if rule.SrcPort == 1023 {
@@ -156,19 +171,6 @@ func (rule *Rule) ToString() string {
 		sb.WriteString(">1023 ")
 	} else {
 		sb.WriteString(strconv.Itoa(int(rule.DstPort)) + " ")
-	}
-
-	switch rule.Protocol {
-	case ProtIcmp:
-		sb.WriteString("icmp ")
-	case ProtTcp:
-		sb.WriteString("tcp ")
-	case ProtUdp:
-		sb.WriteString("udp ")
-	case ProtOther:
-		sb.WriteString("other ")
-	case ProtAny:
-		sb.WriteString("any ")
 	}
 
 	switch rule.Ack {
