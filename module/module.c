@@ -1,4 +1,5 @@
 #include "logs.h"
+#include "netfilter_hook.h"
 #include "rules_table.h"
 
 MODULE_AUTHOR("Itai Spiegel");
@@ -27,9 +28,16 @@ static int __init init(void) {
         goto destroy_show_logs_device;
     }
 
+    if (init_netfilter_hook() < 0) {
+        printk(KERN_ERR "Failed to initialize netfilter hook\n");
+        goto destroy_reset_logs_device;
+    }
+
     printk(KERN_INFO "Firewall loaded\n");
     return 0;
 
+destroy_reset_logs_device:
+    destroy_reset_logs_device(fw_sysfs_class);
 destroy_show_logs_device:
     destroy_show_logs_device(fw_sysfs_class);
 destroy_rules_table_device:
@@ -40,6 +48,7 @@ class_destroy:
 }
 
 static void __exit exit(void) {
+    destroy_netfilter_hook();
     destroy_reset_logs_device(fw_sysfs_class);
     destroy_show_logs_device(fw_sysfs_class);
     destroy_rules_table_device(fw_sysfs_class);
