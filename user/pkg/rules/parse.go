@@ -20,6 +20,19 @@ func parseDirection(direction string) (uint8, error) {
 	}
 }
 
+func parseCidr(cidr string) (net.IP, net.IPMask, error) {
+	if cidr == "any" {
+		return net.IPv4(0, 0, 0, 0), net.CIDRMask(0, 32), nil
+	}
+
+	ip, ipNet, err := net.ParseCIDR(cidr)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return ip, ipNet.Mask, nil
+}
+
 func parsePort(port string) (uint16, error) {
 	switch port {
 	case "any":
@@ -75,7 +88,7 @@ func parseAction(action string) (uint8, error) {
 
 // Parses a rule line into a Rule struct.
 func ParseRule(ruleLine string) (*Rule, error) {
-	fields := strings.Split(ruleLine, " ")
+	fields := strings.Split(strings.ToLower(ruleLine), " ")
 	if len(fields) != 9 {
 		return &Rule{}, errors.New("invalid rule format")
 	}
@@ -84,9 +97,9 @@ func ParseRule(ruleLine string) (*Rule, error) {
 	rawDirection := fields[1]
 	srcCidr := fields[2]
 	dstCidr := fields[3]
-	rawSrcPort := fields[4]
-	rawDstPort := fields[5]
-	rawProtocol := fields[6]
+	rawProtocol := fields[4]
+	rawSrcPort := fields[5]
+	rawDstPort := fields[6]
 	rawAck := fields[7]
 	rawAction := fields[8]
 
@@ -95,12 +108,17 @@ func ParseRule(ruleLine string) (*Rule, error) {
 		return nil, err
 	}
 
-	srcIp, srcIpNet, err := net.ParseCIDR(srcCidr)
+	srcIp, srcIpNetMask, err := parseCidr(srcCidr)
 	if err != nil {
 		return nil, err
 	}
 
-	dstIp, dstIpNet, err := net.ParseCIDR(dstCidr)
+	dstIp, dstIpNetMask, err := parseCidr(dstCidr)
+	if err != nil {
+		return nil, err
+	}
+
+	protocol, err := parseProtocol(rawProtocol)
 	if err != nil {
 		return nil, err
 	}
@@ -111,11 +129,6 @@ func ParseRule(ruleLine string) (*Rule, error) {
 	}
 
 	dstPort, err := parsePort(rawDstPort)
-	if err != nil {
-		return nil, err
-	}
-
-	protocol, err := parseProtocol(rawProtocol)
 	if err != nil {
 		return nil, err
 	}
@@ -134,13 +147,13 @@ func ParseRule(ruleLine string) (*Rule, error) {
 		name,
 		direction,
 		srcIp,
-		srcIpNet.Mask,
+		srcIpNetMask,
 		dstIp,
-		dstIpNet.Mask,
+		dstIpNetMask,
 		srcPort,
 		dstPort,
 		protocol,
 		ack,
 		action,
-	)
+	), nil
 }

@@ -3,7 +3,6 @@ package rules
 import (
 	"bytes"
 	"encoding/binary"
-	"errors"
 	"net"
 	"strconv"
 	"strings"
@@ -58,10 +57,10 @@ func NewRule(
 	dstPort uint16,
 	protocol uint8,
 	ack uint8,
-	action uint8) (*Rule, error) {
+	action uint8) *Rule {
 
 	if len(name) > RuleNameSizeLimit {
-		return &Rule{}, errors.New("name is too long")
+		return nil
 	}
 
 	nameSlice := [RuleNameSizeLimit]byte{0}
@@ -84,7 +83,7 @@ func NewRule(
 		Protocol:      protocol,
 		Ack:           ack,
 		Action:        action,
-	}, nil
+	}
 }
 
 // Unmarshals a rule from a byte slice.

@@ -9,7 +9,7 @@ import (
 )
 
 func TestNewRuleWithTooLongName(t *testing.T) {
-	_, err := NewRule(
+	rule := NewRule(
 		strings.Repeat("a", RuleNameSizeLimit+1),
 		DirectionIn,
 		net.IPv4(1, 2, 3, 4),
@@ -23,11 +23,11 @@ func TestNewRuleWithTooLongName(t *testing.T) {
 		ActionAccept,
 	)
 
-	assert.Error(t, err)
+	assert.Nil(t, rule)
 }
 
 func TestNewRule(t *testing.T) {
-	rule, err := NewRule(
+	rule := NewRule(
 		"test",
 		DirectionAny,
 		net.IPv4(127, 0, 0, 1),
@@ -41,14 +41,13 @@ func TestNewRule(t *testing.T) {
 		ActionAccept,
 	)
 
-	assert.NoError(t, err)
 	assert.Equal(t, [20]byte{'t', 'e', 's', 't'}, rule.Name)
 }
 
 func TestRuleUnmarshal(t *testing.T) {
 	data := []byte{116, 101, 115, 116, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 127, 0, 0, 1, 255, 0, 0, 0, 8, 127, 0, 0, 1, 255, 0, 0, 0, 8, 143, 0, 0, 0, 0, 3, 1}
 	unmarshaled := Unmarshal(data)
-	expected, err := NewRule(
+	expected := NewRule(
 		"test",
 		DirectionAny,
 		net.IPv4(127, 0, 0, 1),
@@ -62,12 +61,11 @@ func TestRuleUnmarshal(t *testing.T) {
 		ActionAccept,
 	)
 
-	assert.NoError(t, err)
 	assert.Equal(t, expected, unmarshaled)
 }
 
 func TestRuleMarshal(t *testing.T) {
-	rule, err := NewRule(
+	rule := NewRule(
 		"test",
 		DirectionAny,
 		net.IPv4(127, 0, 0, 1),
@@ -82,6 +80,5 @@ func TestRuleMarshal(t *testing.T) {
 	)
 	expected := []byte{116, 101, 115, 116, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 127, 0, 0, 1, 255, 0, 0, 0, 8, 127, 0, 0, 1, 255, 0, 0, 0, 8, 143, 0, 0, 0, 0, 3, 1}
 
-	assert.NoError(t, err)
 	assert.Equal(t, expected, rule.Marshal())
 }
