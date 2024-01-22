@@ -23,15 +23,16 @@ func executeLoadRules(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	rulesLines := strings.Split(string(rulesBytes), "\n")
+	normalizedRules := strings.Replace(string(rulesBytes), "\r\n", "\n", -1)
+	rulesLines := strings.Split(normalizedRules, "\n")
 	newRules := make([]rules.Rule, len(rulesLines))
-	for _, ruleLine := range rulesLines {
+	for i, ruleLine := range rulesLines {
 		rule, err := rules.ParseRule(ruleLine)
 		if err != nil {
 			return err
 		}
 
-		newRules = append(newRules, *rule)
+		newRules[i] = *rule
 	}
 
 	return rulestable.SaveRules(newRules)

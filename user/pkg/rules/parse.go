@@ -88,20 +88,20 @@ func parseAction(action string) (uint8, error) {
 
 // Parses a rule line into a Rule struct.
 func ParseRule(ruleLine string) (*Rule, error) {
-	fields := strings.Split(strings.ToLower(ruleLine), " ")
+	fields := strings.Split(ruleLine, " ")
 	if len(fields) != 9 {
 		return &Rule{}, errors.New("invalid rule format")
 	}
 
 	name := fields[0]
-	rawDirection := fields[1]
+	rawDirection := strings.ToLower(fields[1])
 	srcCidr := fields[2]
 	dstCidr := fields[3]
-	rawProtocol := fields[4]
+	rawProtocol := strings.ToLower(fields[4])
 	rawSrcPort := fields[5]
 	rawDstPort := fields[6]
-	rawAck := fields[7]
-	rawAction := fields[8]
+	rawAck := strings.ToLower(fields[7])
+	rawAction := strings.ToLower(fields[8])
 
 	direction, err := parseDirection(rawDirection)
 	if err != nil {

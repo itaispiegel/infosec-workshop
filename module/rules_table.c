@@ -23,21 +23,20 @@ static ssize_t rules_table_show(struct device *dev,
 static ssize_t rules_table_store(struct device *dev,
                                  struct device_attribute *attr, const char *buf,
                                  size_t count) {
-    if (rules_count == MAX_RULES) {
-        printk(KERN_WARNING "Can't add more rules, since the table is full\n");
-        return -ENOMEM;
-    }
 
-    if (count != sizeof(rule_t)) {
-        printk(
-            KERN_WARNING
-            "Can't save rule, since the size is invalid (should be %d bytes)\n",
-            sizeof(rule_t));
+    if (count > MAX_RULES * sizeof(rule_t)) {
+        printk(KERN_WARNING "Can't save rules, since the size is too big\n");
         return -EINVAL;
     }
 
-    memcpy(&rules[rules_count++], buf, sizeof(rule_t));
-    return sizeof(rule_t);
+    if (count % sizeof(rule_t) != 0) {
+        printk(KERN_WARNING "Can't save rules, since the size is invalid\n");
+        return -EINVAL;
+    }
+
+    memcpy(&rules, buf, count);
+    rules_count = count / sizeof(rule_t);
+    return count;
 }
 
 static DEVICE_ATTR(rules, S_IRUSR | S_IWUSR, rules_table_show,

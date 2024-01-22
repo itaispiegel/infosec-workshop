@@ -8,7 +8,7 @@ import (
 
 const (
 	RuleTableDeviceFile = "/sys/class/fw/rules/rules"
-	ruleBytesSize       = 64
+	ruleBytesSize       = 46
 )
 
 // Adds a rule to the firewall rule table.
