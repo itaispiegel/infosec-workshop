@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"os"
+	"strings"
 
 	"github.com/itaispiegel/infosec-workshop/user/pkg/rules"
 	"github.com/itaispiegel/infosec-workshop/user/pkg/rulestable"
@@ -23,7 +24,7 @@ func executeLoadRules(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	rulesLines := utils.SplitLines(string(rulesBytes))
+	rulesLines := utils.SplitLines(strings.TrimSpace(string(rulesBytes)))
 	newRules := make([]rules.Rule, len(rulesLines))
 	for i, ruleLine := range rulesLines {
 		rule, err := rules.ParseRule(ruleLine)
