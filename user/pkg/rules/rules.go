@@ -99,8 +99,8 @@ func Unmarshal(data []byte) *Rule {
 	binary.Read(reader, binary.BigEndian, &rule.DstPrefixMask)
 	binary.Read(reader, binary.LittleEndian, &rule.DstPrefixSize)
 	binary.Read(reader, binary.LittleEndian, &rule.Protocol)
-	binary.Read(reader, binary.LittleEndian, &rule.SrcPort)
-	binary.Read(reader, binary.LittleEndian, &rule.DstPort)
+	binary.Read(reader, binary.BigEndian, &rule.SrcPort) // optimization
+	binary.Read(reader, binary.BigEndian, &rule.DstPort) // optimization
 	binary.Read(reader, binary.LittleEndian, &rule.Ack)
 	binary.Read(reader, binary.LittleEndian, &rule.Action)
 	return &rule
@@ -118,8 +118,8 @@ func (rule *Rule) Marshal() []byte {
 	binary.Write(buf, binary.BigEndian, rule.DstPrefixMask)
 	binary.Write(buf, binary.LittleEndian, rule.DstPrefixSize)
 	binary.Write(buf, binary.LittleEndian, rule.Protocol)
-	binary.Write(buf, binary.LittleEndian, rule.SrcPort)
-	binary.Write(buf, binary.LittleEndian, rule.DstPort)
+	binary.Write(buf, binary.BigEndian, rule.SrcPort) // optimization
+	binary.Write(buf, binary.BigEndian, rule.DstPort) // optimization
 	binary.Write(buf, binary.LittleEndian, rule.Ack)
 	binary.Write(buf, binary.LittleEndian, rule.Action)
 	return buf.Bytes()
