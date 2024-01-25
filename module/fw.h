@@ -100,6 +100,6 @@ typedef struct {
                      // unsigned short
     reason_t reason; // rule#index, or values from: reason_t
     unsigned int count; // counts this line's hits
-} log_row_t;
+} __attribute__((packed)) log_row_t;
 
 #endif // _FW_H_

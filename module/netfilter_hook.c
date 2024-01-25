@@ -1,11 +1,20 @@
 #include <linux/ip.h>
+#include <linux/list.h>
 #include <linux/netfilter.h>
 
 #include "fw.h"
+#include "logs.h"
 #include "netfilter_hook.h"
+
+extern struct list_head logs_list;
 
 extern rule_t rules[MAX_RULES];
 extern __u8 rules_count;
+
+struct ports_tuple {
+    __be16 sport;
+    __be16 dport;
+};
 
 static unsigned int forward_hook_func(void *priv, struct sk_buff *skb,
                                       const struct nf_hook_state *state);
@@ -17,8 +26,8 @@ static const struct nf_hook_ops forward_hook = {
 };
 
 static inline bool match_direction(rule_t *rule, struct sk_buff *skb) {
-    // This is a bit confusing, but the packets that are going outside are
-    // received on the IN device and vice versa, so the direction is reversed.
+    // This is a bit confusing, but the packets going outside are received
+    // on the IN device and vice versa, so the direction is reversed.
     return rule->direction == DIRECTION_ANY ||
            (rule->direction == DIRECTION_IN &&
             strcmp(skb->dev->name, OUT_NET_DEVICE_NAME) == 0) ||
@@ -70,23 +79,148 @@ static inline bool match_ack(rule_t *rule, struct iphdr *ip_header,
              (rule->ack == ACK_NO && !tcp_header->ack)));
 }
 
-static inline bool match_rule_skb(__u8 i, rule_t *rule, struct sk_buff *skb) {
+static inline bool match_rule_skb(rule_t *rule, struct sk_buff *skb) {
     struct iphdr *ip_header = ip_hdr(skb);
     return match_direction(rule, skb) && match_ip_addrs(rule, ip_header) &&
            match_ports(rule, skb) && match_protocol(rule, ip_header) &&
            match_ack(rule, ip_header, tcp_hdr(skb));
 }
 
+static inline bool log_match_rule(log_row_t *log_row, rule_t *rule) {
+    return log_row->protocol == rule->protocol &&
+           log_row->action == rule->action && log_row->src_ip == rule->src_ip &&
+           log_row->dst_ip == rule->dst_ip &&
+           log_row->src_port == rule->src_port &&
+           log_row->dst_port == rule->dst_port;
+}
+
+static inline struct ports_tuple ports_from_skb(struct sk_buff *skb) {
+    struct ports_tuple p;
+    struct iphdr *ip_header = ip_hdr(skb);
+
+    // TODO what happens if the ports are >1023?
+    // should we store the specific port or PORT_ABOVE_1023?
+    if (ip_header->protocol == PROT_UDP) {
+        p.sport = udp_hdr(skb)->source;
+        p.dport = udp_hdr(skb)->dest;
+    } else if (ip_header->protocol == PROT_TCP) {
+        p.sport = tcp_hdr(skb)->source;
+        p.dport = tcp_hdr(skb)->dest;
+    } else {
+        p.sport = 0;
+        p.dport = 0;
+    }
+    return p;
+}
+
+static inline log_row_t new_log_row_by_rule(rule_t *rule, reason_t reason) {
+    return (log_row_t){
+        .timestamp = jiffies, // TODO jiffies is good enough for now, but maybe
+                              // I need to change this to the actual timestamp
+        .protocol = rule->protocol,
+        .action = rule->action,
+        .src_ip = rule->src_ip,
+        .dst_ip = rule->dst_ip,
+        .src_port = rule->src_port,
+        .dst_port = rule->dst_port,
+        .reason = reason,
+        .count = 1,
+    };
+}
+
+static inline log_row_t new_log_row_by_skb(struct sk_buff *skb,
+                                           reason_t reason) {
+    struct ports_tuple ports = ports_from_skb(skb);
+    struct iphdr *ip_header = ip_hdr(skb);
+
+    return (log_row_t){
+        .timestamp = jiffies,
+        .protocol = ip_header->protocol,
+        .action = FW_POLICY,
+        .src_ip = ip_header->saddr,
+        .dst_ip = ip_header->daddr,
+        .src_port = ports.sport,
+        .dst_port = ports.dport,
+        .reason = reason,
+        .count = 1,
+    };
+}
+
+static void update_log_entry_by_matching_rule(rule_t *rule, reason_t reason) {
+    struct log_entry *log_entry;
+    struct list_head *pos;
+    list_for_each(pos, &logs_list) {
+        log_entry = list_entry(pos, struct log_entry, list);
+        if (log_entry->log_row.reason == reason) {
+            log_entry->log_row.count++;
+            log_entry->log_row.timestamp = jiffies;
+            return;
+        }
+    }
+
+    printk(KERN_INFO "Creating a new log entry for rule #%d\n", reason);
+    log_entry = kmalloc(sizeof(struct log_entry), GFP_KERNEL);
+    if (log_entry == NULL) { // TODO decide what to do here
+        printk(KERN_WARNING
+               "Failed to allocate memory for log entry, so ignoring it\n");
+        return;
+    }
+
+    log_entry->log_row = new_log_row_by_rule(rule, reason);
+    list_add_tail(&log_entry->list, &logs_list);
+}
+
+static bool log_entry_matches_skb(struct log_entry *log_entry,
+                                  struct sk_buff *skb) {
+    struct ports_tuple ports = ports_from_skb(skb);
+    struct iphdr *ip_header = ip_hdr(skb);
+
+    return log_entry->log_row.protocol == ip_header->protocol &&
+           log_entry->log_row.src_ip == ip_header->saddr &&
+           log_entry->log_row.dst_ip == ip_header->daddr &&
+           log_entry->log_row.src_port == ports.sport &&
+           log_entry->log_row.dst_port == ports.dport;
+}
+
+static void update_log_entry_by_skb(struct sk_buff *skb, reason_t reason) {
+    struct log_entry *log_entry;
+    struct list_head *pos;
+    list_for_each(pos, &logs_list) {
+        log_entry = list_entry(pos, struct log_entry, list);
+        if (log_entry->log_row.reason == reason &&
+            log_entry_matches_skb(log_entry, skb)) {
+            log_entry->log_row.count++;
+            log_entry->log_row.timestamp = jiffies;
+            return;
+        }
+    }
+
+    printk(KERN_INFO
+           "Creating a new log entry for skb without a matching rule\n");
+    log_entry = kmalloc(sizeof(struct log_entry), GFP_KERNEL);
+    if (log_entry == NULL) { // TODO decide what to do here
+        printk(KERN_WARNING
+               "Failed to allocate memory for log entry, so ignoring it\n");
+        return;
+    }
+
+    log_entry->log_row = new_log_row_by_skb(skb, reason);
+    list_add_tail(&log_entry->list, &logs_list);
+}
+
 static unsigned int forward_hook_func(void *priv, struct sk_buff *skb,
                                       const struct nf_hook_state *state) {
     __u8 i;
     for (i = 0; i < rules_count; i++) {
-        if (match_rule_skb(i, &rules[i], skb)) {
+        if (match_rule_skb(&rules[i], skb)) {
+            update_log_entry_by_matching_rule(&rules[i], i);
             return rules[i].action;
         }
     }
 
-    return NF_DROP;
+    // TODO handle XMAS packets
+    update_log_entry_by_skb(skb, REASON_NO_MATCHING_RULE);
+    return FW_POLICY;
 }
 
 int init_netfilter_hook(void) {
