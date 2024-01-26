@@ -4,13 +4,24 @@
 #include "fw.h"
 #include "logs.h"
 
+LIST_HEAD(logs_list);
+size_t logs_count = 0;
+
 static int show_logs_dev_major;
 static struct device *show_logs_dev;
 
 static int reset_logs_dev_major;
 static struct device *reset_logs_dev;
 
-static struct file_operations fops = {
+ssize_t show_logs_dev_read(struct file *filp, char *buf, size_t len,
+                           loff_t *off);
+
+static struct file_operations show_logs_device_fops = {
+    .owner = THIS_MODULE,
+    .read = show_logs_dev_read,
+};
+
+static struct file_operations reset_logs_device_fops = {
     .owner = THIS_MODULE,
 };
 
@@ -22,8 +33,39 @@ static ssize_t reset_logs_store(struct device *dev,
 
 static DEVICE_ATTR(reset, S_IWUSR, NULL, reset_logs_store);
 
+ssize_t show_logs_dev_read(struct file *filp, char __user *buf, size_t len,
+                           loff_t *off) {
+    struct log_entry *log_entry;
+    struct list_head *pos;
+
+    if (*off >= logs_count * sizeof(log_row_t)) {
+        return 0;
+    }
+
+    // We currently don't support reading from a specific offset.
+    if (*off > 0 || len <= sizeof(log_row_t)) {
+        return -EINVAL;
+    }
+
+    list_for_each(pos, &logs_list) {
+        if (*off + sizeof(log_row_t) > len) {
+            return -EINVAL;
+        }
+
+        log_entry = list_entry(pos, struct log_entry, list);
+        if (copy_to_user(buf + *off, &(log_entry->log_row),
+                         sizeof(log_row_t))) {
+            return -EFAULT;
+        }
+        *off += sizeof(log_row_t);
+    }
+
+    return *off;
+}
+
 int init_show_logs_device(struct class *fw_sysfs_class) {
-    show_logs_dev_major = register_chrdev(0, DEVICE_NAME_SHOW_LOGS, &fops);
+    show_logs_dev_major =
+        register_chrdev(0, DEVICE_NAME_SHOW_LOGS, &show_logs_device_fops);
     if (show_logs_dev_major < 0) {
         return show_logs_dev_major;
     }
@@ -43,7 +85,8 @@ unregister_chrdev:
 }
 
 int init_reset_logs_device(struct class *fw_sysfs_class) {
-    reset_logs_dev_major = register_chrdev(0, DEVICE_NAME_RESET_LOGS, &fops);
+    reset_logs_dev_major =
+        register_chrdev(0, DEVICE_NAME_RESET_LOGS, &reset_logs_device_fops);
     if (reset_logs_dev_major < 0) {
         return reset_logs_dev_major;
     }

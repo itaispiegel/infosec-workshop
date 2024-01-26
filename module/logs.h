@@ -6,14 +6,13 @@
 
 #include "fw.h"
 
-static LIST_HEAD(logs_list);
+extern struct list_head logs_list;
+extern size_t logs_count;
 
 struct log_entry {
     log_row_t log_row;
     struct list_head list;
 };
-
-// extern LIST_HEAD(logs_list);
 
 int init_show_logs_device(struct class *fw_sysfs_class);
 int init_reset_logs_device(struct class *fw_sysfs_class);

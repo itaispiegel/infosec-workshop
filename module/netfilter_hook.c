@@ -7,6 +7,7 @@
 #include "netfilter_hook.h"
 
 extern struct list_head logs_list;
+extern size_t logs_count;
 
 extern rule_t rules[MAX_RULES];
 extern __u8 rules_count;
@@ -168,6 +169,7 @@ static void update_log_entry_by_matching_rule(rule_t *rule, reason_t reason) {
 
     log_entry->log_row = new_log_row_by_rule(rule, reason);
     list_add_tail(&log_entry->list, &logs_list);
+    logs_count++;
 }
 
 static bool log_entry_matches_skb(struct log_entry *log_entry,
@@ -206,6 +208,7 @@ static void update_log_entry_by_skb(struct sk_buff *skb, reason_t reason) {
 
     log_entry->log_row = new_log_row_by_skb(skb, reason);
     list_add_tail(&log_entry->list, &logs_list);
+    logs_count++;
 }
 
 static unsigned int forward_hook_func(void *priv, struct sk_buff *skb,
