@@ -18,7 +18,7 @@ typedef enum {
     PROT_UDP = 17,
     PROT_OTHER = 255,
     PROT_ANY = 143,
-} prot_t;
+} __attribute__((packed)) prot_t;
 
 // various reasons to be registered in each log entry
 typedef enum {
@@ -26,7 +26,7 @@ typedef enum {
     REASON_NO_MATCHING_RULE = -2,
     REASON_XMAS_PACKET = -4,
     REASON_ILLEGAL_VALUE = -6,
-} reason_t;
+} __attribute__((packed)) reason_t;
 
 // auxiliary strings, for your convenience
 #define DEVICE_NAME_RULES "rules"
