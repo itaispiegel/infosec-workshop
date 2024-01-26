@@ -48,8 +48,9 @@ int init_rules_table_device(struct class *fw_sysfs_class) {
         return rules_dev_major;
     }
 
-    rules_dev = device_create(fw_sysfs_class, NULL, MKDEV(rules_dev_major, 0),
-                              NULL, DEVICE_NAME_RULES);
+    rules_dev =
+        device_create(fw_sysfs_class, NULL, MKDEV(rules_dev_major, MINOR_LOG),
+                      NULL, DEVICE_NAME_RULES);
     if (IS_ERR(rules_dev)) {
         goto unregister_chrdev;
     }

@@ -70,9 +70,9 @@ int init_show_logs_device(struct class *fw_sysfs_class) {
         return show_logs_dev_major;
     }
 
-    show_logs_dev =
-        device_create(fw_sysfs_class, NULL, MKDEV(show_logs_dev_major, 0), NULL,
-                      DEVICE_NAME_SHOW_LOGS);
+    show_logs_dev = device_create(fw_sysfs_class, NULL,
+                                  MKDEV(show_logs_dev_major, MINOR_LOG), NULL,
+                                  DEVICE_NAME_SHOW_LOGS);
     if (IS_ERR(show_logs_dev)) {
         goto unregister_chrdev;
     }
