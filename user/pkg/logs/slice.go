@@ -33,15 +33,11 @@ func (logs *logsSlice) String() string {
 		"Timestamp           " +
 			"SrcIP    " +
 			"DstIP   " +
-			"SrcPort DstPort  Protocol Action Reason Count\n",
+			"SrcPort DstPort  Protocol Action Reason Count",
 	)
 
-	for i, log := range *logs {
-		sb.WriteString(log.ToString())
-
-		if i < len(*logs)-1 {
-			sb.WriteString("\n")
-		}
+	for _, log := range *logs {
+		sb.WriteString("\n" + log.ToString())
 	}
 	return sb.String()
 }
