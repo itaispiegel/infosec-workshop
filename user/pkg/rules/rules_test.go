@@ -45,7 +45,21 @@ func TestNewRule(t *testing.T) {
 }
 
 func TestRuleUnmarshal(t *testing.T) {
-	data := []byte{116, 101, 115, 116, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 127, 0, 0, 1, 255, 0, 0, 0, 8, 127, 0, 0, 1, 255, 0, 0, 0, 8, 143, 0, 0, 0, 0, 3, 1}
+	data := []byte{
+		116, 101, 115, 116, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		DirectionAny,
+		127, 0, 0, 1,
+		255, 0, 0, 0,
+		8,
+		127, 0, 0, 1,
+		255, 0, 0, 0,
+		8,
+		0, 0,
+		0, 0,
+		ProtAny,
+		AckAny,
+		ActionAccept,
+	}
 	unmarshaled := Unmarshal(data)
 	expected := NewRule(
 		"test",
@@ -78,7 +92,21 @@ func TestRuleMarshal(t *testing.T) {
 		AckAny,
 		ActionAccept,
 	)
-	expected := []byte{116, 101, 115, 116, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 127, 0, 0, 1, 255, 0, 0, 0, 8, 127, 0, 0, 1, 255, 0, 0, 0, 8, 143, 0, 0, 0, 0, 3, 1}
+	expected := []byte{
+		116, 101, 115, 116, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		DirectionAny,
+		127, 0, 0, 1,
+		255, 0, 0, 0,
+		8,
+		127, 0, 0, 1,
+		255, 0, 0, 0,
+		8,
+		0, 0,
+		0, 0,
+		ProtAny,
+		AckAny,
+		ActionAccept,
+	}
 
 	assert.Equal(t, expected, rule.Marshal())
 }
