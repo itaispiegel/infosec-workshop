@@ -28,7 +28,17 @@ static struct file_operations reset_logs_device_fops = {
 static ssize_t reset_logs_store(struct device *dev,
                                 struct device_attribute *attr, const char *buf,
                                 size_t count) {
-    return 0;
+    if (count == 6 &&
+        strncmp(buf, "reset", 5) == 0) { // +1 for the null terminator
+        struct log_entry *log_entry, *tmp;
+        list_for_each_entry_safe(log_entry, tmp, &logs_list, list) {
+            list_del(&log_entry->list);
+            kfree(log_entry);
+            logs_count--;
+        }
+    }
+
+    return count;
 }
 
 static DEVICE_ATTR(reset, S_IWUSR, NULL, reset_logs_store);
