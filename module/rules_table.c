@@ -48,9 +48,8 @@ int init_rules_table_device(struct class *fw_sysfs_class) {
         return rules_dev_major;
     }
 
-    rules_dev =
-        device_create(fw_sysfs_class, NULL, MKDEV(rules_dev_major, MINOR_LOG),
-                      NULL, DEVICE_NAME_RULES);
+    rules_dev = device_create(fw_sysfs_class, NULL, MKDEV(rules_dev_major, 0),
+                              NULL, DEVICE_NAME_RULES);
     if (IS_ERR(rules_dev)) {
         goto unregister_chrdev;
     }
@@ -70,6 +69,8 @@ unregister_chrdev:
 }
 
 void destroy_rules_table_device(struct class *fw_sysfs_class) {
+    device_remove_file(rules_dev,
+                       (const struct device_attribute *)&dev_attr_rules.attr);
     device_destroy(fw_sysfs_class, MKDEV(rules_dev_major, 0));
     unregister_chrdev(rules_dev_major, DEVICE_NAME_RULES);
 }

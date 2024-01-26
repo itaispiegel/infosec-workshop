@@ -70,9 +70,9 @@ int init_show_logs_device(struct class *fw_sysfs_class) {
         return show_logs_dev_major;
     }
 
-    show_logs_dev = device_create(fw_sysfs_class, NULL,
-                                  MKDEV(show_logs_dev_major, MINOR_LOG), NULL,
-                                  DEVICE_NAME_SHOW_LOGS);
+    show_logs_dev =
+        device_create(fw_sysfs_class, NULL, MKDEV(show_logs_dev_major, 0), NULL,
+                      DEVICE_NAME_SHOW_LOGS);
     if (IS_ERR(show_logs_dev)) {
         goto unregister_chrdev;
     }
@@ -114,6 +114,8 @@ unregister_chrdev:
 }
 
 void destroy_show_logs_device(struct class *fw_sysfs_class) {
+    device_remove_file(show_logs_dev,
+                       (const struct device_attribute *)&dev_attr_reset.attr);
     device_destroy(fw_sysfs_class, MKDEV(show_logs_dev_major, 0));
     unregister_chrdev(show_logs_dev_major, DEVICE_NAME_RULES);
 }
