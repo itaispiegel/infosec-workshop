@@ -116,8 +116,7 @@ static inline struct ports_tuple ports_from_skb(struct sk_buff *skb) {
 
 static inline log_row_t new_log_row_by_rule(rule_t *rule, reason_t reason) {
     return (log_row_t){
-        .timestamp = jiffies, // TODO jiffies is good enough for now, but maybe
-                              // I need to change this to the actual timestamp
+        .timestamp = ktime_get_real_seconds(),
         .protocol = rule->protocol,
         .action = rule->action,
         .src_ip = rule->src_ip,
@@ -135,7 +134,7 @@ static inline log_row_t new_log_row_by_skb(struct sk_buff *skb,
     struct iphdr *ip_header = ip_hdr(skb);
 
     return (log_row_t){
-        .timestamp = jiffies,
+        .timestamp = ktime_get_real_seconds(),
         .protocol = ip_header->protocol,
         .action = FW_POLICY,
         .src_ip = ip_header->saddr,
@@ -154,7 +153,7 @@ static void update_log_entry_by_matching_rule(rule_t *rule, reason_t reason) {
         log_entry = list_entry(pos, struct log_entry, list);
         if (log_entry->log_row.reason == reason) {
             log_entry->log_row.count++;
-            log_entry->log_row.timestamp = jiffies;
+            log_entry->log_row.timestamp = ktime_get_real_seconds();
             return;
         }
     }
@@ -192,7 +191,7 @@ static void update_log_entry_by_skb(struct sk_buff *skb, reason_t reason) {
         if (log_entry->log_row.reason == reason &&
             log_entry_matches_skb(log_entry, skb)) {
             log_entry->log_row.count++;
-            log_entry->log_row.timestamp = jiffies;
+            log_entry->log_row.timestamp = ktime_get_real_seconds();
             return;
         }
     }
@@ -222,6 +221,8 @@ static unsigned int forward_hook_func(void *priv, struct sk_buff *skb,
     }
 
     // TODO handle XMAS packets
+    // TODO accept any non TCP, UDP and ICMP and IPv6 packets without logging
+    // TODOD Accept any loopback packet without logging
     update_log_entry_by_skb(skb, REASON_NO_MATCHING_RULE);
     return FW_POLICY;
 }
