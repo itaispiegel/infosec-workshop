@@ -4,7 +4,7 @@ import (
 	"net"
 	"testing"
 
-	"github.com/itaispiegel/infosec-workshop/user/pkg/fwconsts"
+	"github.com/itaispiegel/infosec-workshop/user/pkg/fwtypes"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -17,32 +17,32 @@ func TestParseRule(t *testing.T) {
 			textual: "myrule1 any 127.0.0.1/8 127.0.0.1/8 any any any any accept",
 			expected: NewRule(
 				"myrule1",
-				DirectionAny,
+				fwtypes.DirectionAny,
 				net.IPv4(127, 0, 0, 1),
 				net.CIDRMask(8, 32),
 				net.IPv4(127, 0, 0, 1),
 				net.CIDRMask(8, 32),
 				0,
 				0,
-				fwconsts.ProtAny,
-				AckAny,
-				ActionAccept,
+				fwtypes.ProtAny,
+				fwtypes.AckAny,
+				fwtypes.ActionAccept,
 			),
 		},
 		{
 			textual: "myrule2 in 1.1.1.1/21 any ICMP any >1023 yes drop",
 			expected: NewRule(
 				"myrule2",
-				DirectionIn,
+				fwtypes.DirectionIn,
 				net.IPv4(1, 1, 1, 1),
 				net.CIDRMask(21, 32),
 				net.IPv4(0, 0, 0, 0),
 				net.CIDRMask(0, 32),
 				0,
 				1023,
-				fwconsts.ProtIcmp,
-				AckYes,
-				ActionDrop,
+				fwtypes.ProtIcmp,
+				fwtypes.AckYes,
+				fwtypes.ActionDrop,
 			),
 		},
 	}

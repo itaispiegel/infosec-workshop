@@ -8,24 +8,28 @@ import (
 	"strings"
 	"time"
 
-	"github.com/itaispiegel/infosec-workshop/user/pkg/fwconsts"
+	"github.com/itaispiegel/infosec-workshop/user/pkg/fwtypes"
+)
+
+const (
+	logsDateTimeFormat = "02/01/2006 15:04:05"
 )
 
 type Log struct {
 	Timestamp uint32
-	Protocol  uint8
-	Action    uint8
-	SrcIp     [4]byte
-	DstIp     [4]byte
-	SrcPort   uint16
-	DstPort   uint16
-	Reason    int8
-	Count     uint32
+	fwtypes.Protocol
+	fwtypes.Action
+	SrcIp   [4]byte
+	DstIp   [4]byte
+	SrcPort uint16
+	DstPort uint16
+	Reason  int8
+	Count   uint32
 }
 
 func NewLog(
 	timestamp time.Time,
-	protocol uint8,
+	protocol fwtypes.Protocol,
 	srcIp,
 	dstIp net.IP,
 	srcPort,
@@ -68,7 +72,7 @@ func (log *Log) ToString() string {
 	// TODO find a better solution for formatting the table's spaces
 	ts := time.Unix(int64(log.Timestamp), 0)
 	sb := strings.Builder{}
-	sb.WriteString(ts.Format("02/01/2006 15:04:05"))
+	sb.WriteString(ts.Format(logsDateTimeFormat))
 	sb.WriteByte(' ')
 
 	sb.WriteString(net.IP(log.SrcIp[:]).String() + " ")
@@ -77,29 +81,8 @@ func (log *Log) ToString() string {
 	sb.WriteString(strconv.Itoa(int(log.SrcPort)) + "    ")
 	sb.WriteString(strconv.Itoa(int(log.DstPort)) + "       ")
 
-	// TODO remove duplication
-	switch log.Protocol {
-	case fwconsts.ProtIcmp:
-		sb.WriteString("icmp ")
-	case fwconsts.ProtTcp:
-		sb.WriteString("tcp ")
-	case fwconsts.ProtUdp:
-		sb.WriteString("udp ")
-	case fwconsts.ProtOther:
-		sb.WriteString("other ")
-	case fwconsts.ProtAny:
-		sb.WriteString("any ")
-	}
-
-	sb.WriteString("     ")
-
-	// TODO remove duplication
-	switch log.Action {
-	case fwconsts.ActionAccept:
-		sb.WriteString("accept ")
-	case fwconsts.ActionDrop:
-		sb.WriteString("drop ")
-	}
+	sb.WriteString(log.Protocol.String() + "      ")
+	sb.WriteString(log.Action.String() + " ")
 
 	// TODO handle different reasons
 	sb.WriteString(strconv.Itoa(int(log.Reason)) + "      ")

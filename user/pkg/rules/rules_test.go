@@ -5,23 +5,23 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/itaispiegel/infosec-workshop/user/pkg/fwconsts"
+	"github.com/itaispiegel/infosec-workshop/user/pkg/fwtypes"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestNewRuleWithTooLongName(t *testing.T) {
 	rule := NewRule(
 		strings.Repeat("a", RuleNameSizeLimit+1),
-		DirectionIn,
+		fwtypes.DirectionIn,
 		net.IPv4(1, 2, 3, 4),
 		net.CIDRMask(24, 32),
 		net.IPv4(5, 6, 7, 8),
 		net.CIDRMask(24, 32),
 		0,
 		0,
-		fwconsts.ProtAny,
-		AckAny,
-		ActionAccept,
+		fwtypes.ProtAny,
+		fwtypes.AckAny,
+		fwtypes.ActionAccept,
 	)
 
 	assert.Nil(t, rule)
@@ -30,16 +30,16 @@ func TestNewRuleWithTooLongName(t *testing.T) {
 func TestNewRule(t *testing.T) {
 	rule := NewRule(
 		"test",
-		DirectionAny,
+		fwtypes.DirectionAny,
 		net.IPv4(127, 0, 0, 1),
 		net.CIDRMask(8, 32),
 		net.IPv4(127, 0, 0, 1),
 		net.CIDRMask(8, 32),
 		0,
 		0,
-		fwconsts.ProtAny,
-		AckAny,
-		ActionAccept,
+		fwtypes.ProtAny,
+		fwtypes.AckAny,
+		fwtypes.ActionAccept,
 	)
 
 	assert.Equal(t, [20]byte{'t', 'e', 's', 't'}, rule.Name)
@@ -48,7 +48,7 @@ func TestNewRule(t *testing.T) {
 func TestRuleUnmarshal(t *testing.T) {
 	data := []byte{
 		116, 101, 115, 116, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		DirectionAny,
+		fwtypes.DirectionAny,
 		127, 0, 0, 1,
 		255, 0, 0, 0,
 		8,
@@ -57,23 +57,23 @@ func TestRuleUnmarshal(t *testing.T) {
 		8,
 		0, 0,
 		0, 0,
-		fwconsts.ProtAny,
-		AckAny,
-		ActionAccept,
+		fwtypes.ProtAny,
+		fwtypes.AckAny,
+		fwtypes.ActionAccept,
 	}
 	unmarshaled := Unmarshal(data)
 	expected := NewRule(
 		"test",
-		DirectionAny,
+		fwtypes.DirectionAny,
 		net.IPv4(127, 0, 0, 1),
 		net.CIDRMask(8, 32),
 		net.IPv4(127, 0, 0, 1),
 		net.CIDRMask(8, 32),
 		0,
 		0,
-		fwconsts.ProtAny,
-		AckAny,
-		ActionAccept,
+		fwtypes.ProtAny,
+		fwtypes.AckAny,
+		fwtypes.ActionAccept,
 	)
 
 	assert.Equal(t, expected, unmarshaled)
@@ -82,20 +82,20 @@ func TestRuleUnmarshal(t *testing.T) {
 func TestRuleMarshal(t *testing.T) {
 	rule := NewRule(
 		"test",
-		DirectionAny,
+		fwtypes.DirectionAny,
 		net.IPv4(127, 0, 0, 1),
 		net.CIDRMask(8, 32),
 		net.IPv4(127, 0, 0, 1),
 		net.CIDRMask(8, 32),
 		0,
 		0,
-		fwconsts.ProtAny,
-		AckAny,
-		ActionAccept,
+		fwtypes.ProtAny,
+		fwtypes.AckAny,
+		fwtypes.ActionAccept,
 	)
 	expected := []byte{
 		116, 101, 115, 116, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		DirectionAny,
+		fwtypes.DirectionAny,
 		127, 0, 0, 1,
 		255, 0, 0, 0,
 		8,
@@ -104,9 +104,9 @@ func TestRuleMarshal(t *testing.T) {
 		8,
 		0, 0,
 		0, 0,
-		fwconsts.ProtAny,
-		AckAny,
-		ActionAccept,
+		fwtypes.ProtAny,
+		fwtypes.AckAny,
+		fwtypes.ActionAccept,
 	}
 
 	assert.Equal(t, expected, rule.Marshal())

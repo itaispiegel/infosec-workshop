@@ -6,21 +6,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/itaispiegel/infosec-workshop/user/pkg/fwconsts"
+	"github.com/itaispiegel/infosec-workshop/user/pkg/fwtypes"
 )
-
-func parseDirection(direction string) (uint8, error) {
-	switch direction {
-	case "in":
-		return DirectionIn, nil
-	case "out":
-		return DirectionOut, nil
-	case "any":
-		return DirectionAny, nil
-	default:
-		return 0, errors.New("invalid direction")
-	}
-}
 
 func parseCidr(cidr string) (net.IP, net.IPMask, error) {
 	if cidr == "any" {
@@ -47,47 +34,6 @@ func parsePort(port string) (uint16, error) {
 	}
 }
 
-func parseProtocol(protocol string) (uint8, error) {
-	switch protocol {
-	case "icmp":
-		return fwconsts.ProtIcmp, nil
-	case "tcp":
-		return fwconsts.ProtTcp, nil
-	case "udp":
-		return fwconsts.ProtUdp, nil
-	case "other":
-		return fwconsts.ProtOther, nil
-	case "any":
-		return fwconsts.ProtAny, nil
-	default:
-		return 0, errors.New("invalid protocol")
-	}
-}
-
-func parseAck(ack string) (uint8, error) {
-	switch ack {
-	case "no":
-		return AckNo, nil
-	case "yes":
-		return AckYes, nil
-	case "any":
-		return AckAny, nil
-	default:
-		return 0, errors.New("invalid ack")
-	}
-}
-
-func parseAction(action string) (uint8, error) {
-	switch action {
-	case "drop":
-		return ActionDrop, nil
-	case "accept":
-		return ActionAccept, nil
-	default:
-		return 0, errors.New("invalid action")
-	}
-}
-
 // Parses a rule line into a Rule struct.
 func ParseRule(ruleLine string) (*Rule, error) {
 	fields := strings.Split(ruleLine, " ")
@@ -105,7 +51,7 @@ func ParseRule(ruleLine string) (*Rule, error) {
 	rawAck := strings.ToLower(fields[7])
 	rawAction := strings.ToLower(fields[8])
 
-	direction, err := parseDirection(rawDirection)
+	direction, err := fwtypes.DirectionFromString(rawDirection)
 	if err != nil {
 		return nil, err
 	}
@@ -120,7 +66,7 @@ func ParseRule(ruleLine string) (*Rule, error) {
 		return nil, err
 	}
 
-	protocol, err := parseProtocol(rawProtocol)
+	protocol, err := fwtypes.ProtocolFromString(rawProtocol)
 	if err != nil {
 		return nil, err
 	}
@@ -135,12 +81,12 @@ func ParseRule(ruleLine string) (*Rule, error) {
 		return nil, err
 	}
 
-	ack, err := parseAck(rawAck)
+	ack, err := fwtypes.AckFromString(rawAck)
 	if err != nil {
 		return nil, err
 	}
 
-	action, err := parseAction(rawAction)
+	action, err := fwtypes.ActionFromString(rawAction)
 	if err != nil {
 		return nil, err
 	}

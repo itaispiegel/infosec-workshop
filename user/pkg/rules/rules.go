@@ -7,27 +7,16 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/itaispiegel/infosec-workshop/user/pkg/fwconsts"
+	"github.com/itaispiegel/infosec-workshop/user/pkg/fwtypes"
 )
 
 const (
 	RuleNameSizeLimit = 20
-
-	DirectionIn  = 0x01
-	DirectionOut = 0x02
-	DirectionAny = DirectionIn | DirectionOut
-
-	AckNo  = 0x01
-	AckYes = 0x02
-	AckAny = AckNo | AckYes
-
-	ActionDrop   = 0
-	ActionAccept = 1
 )
 
 type Rule struct {
-	Name          [RuleNameSizeLimit]byte
-	Direction     uint8
+	Name [RuleNameSizeLimit]byte
+	fwtypes.Direction
 	SrcIp         [4]byte
 	SrcPrefixMask [4]byte
 	SrcPrefixSize uint8
@@ -36,24 +25,24 @@ type Rule struct {
 	DstPrefixSize uint8
 	SrcPort       uint16
 	DstPort       uint16
-	Protocol      uint8
-	Ack           uint8
-	Action        uint8
+	fwtypes.Protocol
+	fwtypes.Ack
+	fwtypes.Action
 }
 
 // Creates a new rule.
 func NewRule(
 	name string,
-	direction uint8,
+	direction fwtypes.Direction,
 	srcIp net.IP,
 	srcPrefixMask net.IPMask,
 	dstIp net.IP,
 	dstPrefixMask net.IPMask,
 	srcPort uint16,
 	dstPort uint16,
-	protocol uint8,
-	ack uint8,
-	action uint8) *Rule {
+	protocol fwtypes.Protocol,
+	ack fwtypes.Ack,
+	action fwtypes.Action) *Rule {
 
 	if len(name) > RuleNameSizeLimit {
 		return nil
@@ -126,31 +115,12 @@ func (rule *Rule) String() string {
 	sb := strings.Builder{}
 	sb.Write(rule.Name[:])
 	sb.WriteByte(' ')
-	switch rule.Direction {
-	case DirectionIn:
-		sb.WriteString("in")
-	case DirectionOut:
-		sb.WriteString("out")
-	case DirectionAny:
-		sb.WriteString("any")
-	}
-	sb.WriteByte(' ')
+	sb.WriteString(rule.Direction.String() + " ")
 
 	sb.WriteString(net.IP(rule.SrcIp[:]).String() + "/" + strconv.Itoa(int(rule.SrcPrefixSize)) + " ")
 	sb.WriteString(net.IP(rule.DstIp[:]).String() + "/" + strconv.Itoa(int(rule.DstPrefixSize)) + " ")
 
-	switch rule.Protocol {
-	case fwconsts.ProtIcmp:
-		sb.WriteString("icmp ")
-	case fwconsts.ProtTcp:
-		sb.WriteString("tcp ")
-	case fwconsts.ProtUdp:
-		sb.WriteString("udp ")
-	case fwconsts.ProtOther:
-		sb.WriteString("other ")
-	case fwconsts.ProtAny:
-		sb.WriteString("any ")
-	}
+	sb.WriteString(rule.Protocol.String() + " ")
 
 	if rule.SrcPort == 0 {
 		sb.WriteString("any ")
@@ -168,21 +138,8 @@ func (rule *Rule) String() string {
 		sb.WriteString(strconv.Itoa(int(rule.DstPort)) + " ")
 	}
 
-	switch rule.Ack {
-	case AckNo:
-		sb.WriteString("no ")
-	case AckYes:
-		sb.WriteString("yes ")
-	case AckAny:
-		sb.WriteString("any ")
-	}
-
-	switch rule.Action {
-	case ActionDrop:
-		sb.WriteString("drop")
-	case ActionAccept:
-		sb.WriteString("accept")
-	}
+	sb.WriteString(rule.Ack.String() + " ")
+	sb.WriteString(rule.Action.String())
 
 	return sb.String()
 }
