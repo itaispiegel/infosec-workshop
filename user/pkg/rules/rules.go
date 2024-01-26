@@ -6,6 +6,8 @@ import (
 	"net"
 	"strconv"
 	"strings"
+
+	"github.com/itaispiegel/infosec-workshop/user/pkg/fwconsts"
 )
 
 const (
@@ -18,12 +20,6 @@ const (
 	AckNo  = 0x01
 	AckYes = 0x02
 	AckAny = AckNo | AckYes
-
-	ProtIcmp  = 1
-	ProtTcp   = 6
-	ProtUdp   = 17
-	ProtOther = 255
-	ProtAny   = 143
 
 	ActionDrop   = 0
 	ActionAccept = 1
@@ -98,8 +94,8 @@ func Unmarshal(data []byte) *Rule {
 	binary.Read(reader, binary.BigEndian, &rule.DstIp)
 	binary.Read(reader, binary.BigEndian, &rule.DstPrefixMask)
 	binary.Read(reader, binary.LittleEndian, &rule.DstPrefixSize)
-	binary.Read(reader, binary.BigEndian, &rule.SrcPort) // optimization
-	binary.Read(reader, binary.BigEndian, &rule.DstPort) // optimization
+	binary.Read(reader, binary.BigEndian, &rule.SrcPort)
+	binary.Read(reader, binary.BigEndian, &rule.DstPort)
 	binary.Read(reader, binary.LittleEndian, &rule.Protocol)
 	binary.Read(reader, binary.LittleEndian, &rule.Ack)
 	binary.Read(reader, binary.LittleEndian, &rule.Action)
@@ -117,8 +113,8 @@ func (rule *Rule) Marshal() []byte {
 	binary.Write(buf, binary.BigEndian, rule.DstIp)
 	binary.Write(buf, binary.BigEndian, rule.DstPrefixMask)
 	binary.Write(buf, binary.LittleEndian, rule.DstPrefixSize)
-	binary.Write(buf, binary.BigEndian, rule.SrcPort) // optimization
-	binary.Write(buf, binary.BigEndian, rule.DstPort) // optimization
+	binary.Write(buf, binary.BigEndian, rule.SrcPort)
+	binary.Write(buf, binary.BigEndian, rule.DstPort)
 	binary.Write(buf, binary.LittleEndian, rule.Protocol)
 	binary.Write(buf, binary.LittleEndian, rule.Ack)
 	binary.Write(buf, binary.LittleEndian, rule.Action)
@@ -126,7 +122,7 @@ func (rule *Rule) Marshal() []byte {
 }
 
 // Returns a string representation of the rule.
-func (rule *Rule) ToString() string {
+func (rule *Rule) String() string {
 	sb := strings.Builder{}
 	sb.Write(rule.Name[:])
 	sb.WriteByte(' ')
@@ -144,15 +140,15 @@ func (rule *Rule) ToString() string {
 	sb.WriteString(net.IP(rule.DstIp[:]).String() + "/" + strconv.Itoa(int(rule.DstPrefixSize)) + " ")
 
 	switch rule.Protocol {
-	case ProtIcmp:
+	case fwconsts.ProtIcmp:
 		sb.WriteString("icmp ")
-	case ProtTcp:
+	case fwconsts.ProtTcp:
 		sb.WriteString("tcp ")
-	case ProtUdp:
+	case fwconsts.ProtUdp:
 		sb.WriteString("udp ")
-	case ProtOther:
+	case fwconsts.ProtOther:
 		sb.WriteString("other ")
-	case ProtAny:
+	case fwconsts.ProtAny:
 		sb.WriteString("any ")
 	}
 

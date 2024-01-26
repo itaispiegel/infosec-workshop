@@ -5,6 +5,8 @@ import (
 	"net"
 	"strconv"
 	"strings"
+
+	"github.com/itaispiegel/infosec-workshop/user/pkg/fwconsts"
 )
 
 func parseDirection(direction string) (uint8, error) {
@@ -48,15 +50,15 @@ func parsePort(port string) (uint16, error) {
 func parseProtocol(protocol string) (uint8, error) {
 	switch protocol {
 	case "icmp":
-		return ProtIcmp, nil
+		return fwconsts.ProtIcmp, nil
 	case "tcp":
-		return ProtTcp, nil
+		return fwconsts.ProtTcp, nil
 	case "udp":
-		return ProtUdp, nil
+		return fwconsts.ProtUdp, nil
 	case "other":
-		return ProtOther, nil
+		return fwconsts.ProtOther, nil
 	case "any":
-		return ProtAny, nil
+		return fwconsts.ProtAny, nil
 	default:
 		return 0, errors.New("invalid protocol")
 	}

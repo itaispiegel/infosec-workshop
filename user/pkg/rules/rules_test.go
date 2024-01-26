@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/itaispiegel/infosec-workshop/user/pkg/fwconsts"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -18,7 +19,7 @@ func TestNewRuleWithTooLongName(t *testing.T) {
 		net.CIDRMask(24, 32),
 		0,
 		0,
-		ProtAny,
+		fwconsts.ProtAny,
 		AckAny,
 		ActionAccept,
 	)
@@ -36,7 +37,7 @@ func TestNewRule(t *testing.T) {
 		net.CIDRMask(8, 32),
 		0,
 		0,
-		ProtAny,
+		fwconsts.ProtAny,
 		AckAny,
 		ActionAccept,
 	)
@@ -56,7 +57,7 @@ func TestRuleUnmarshal(t *testing.T) {
 		8,
 		0, 0,
 		0, 0,
-		ProtAny,
+		fwconsts.ProtAny,
 		AckAny,
 		ActionAccept,
 	}
@@ -70,7 +71,7 @@ func TestRuleUnmarshal(t *testing.T) {
 		net.CIDRMask(8, 32),
 		0,
 		0,
-		ProtAny,
+		fwconsts.ProtAny,
 		AckAny,
 		ActionAccept,
 	)
@@ -88,7 +89,7 @@ func TestRuleMarshal(t *testing.T) {
 		net.CIDRMask(8, 32),
 		0,
 		0,
-		ProtAny,
+		fwconsts.ProtAny,
 		AckAny,
 		ActionAccept,
 	)
@@ -103,7 +104,7 @@ func TestRuleMarshal(t *testing.T) {
 		8,
 		0, 0,
 		0, 0,
-		ProtAny,
+		fwconsts.ProtAny,
 		AckAny,
 		ActionAccept,
 	}

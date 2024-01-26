@@ -4,6 +4,7 @@ import (
 	"net"
 	"testing"
 
+	"github.com/itaispiegel/infosec-workshop/user/pkg/fwconsts"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -23,7 +24,7 @@ func TestParseRule(t *testing.T) {
 				net.CIDRMask(8, 32),
 				0,
 				0,
-				ProtAny,
+				fwconsts.ProtAny,
 				AckAny,
 				ActionAccept,
 			),
@@ -39,7 +40,7 @@ func TestParseRule(t *testing.T) {
 				net.CIDRMask(0, 32),
 				0,
 				1023,
-				ProtIcmp,
+				fwconsts.ProtIcmp,
 				AckYes,
 				ActionDrop,
 			),

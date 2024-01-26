@@ -7,7 +7,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var showCmd = &cobra.Command{
+var showRulesCmd = &cobra.Command{
 	Use:   "show_rules",
 	Short: "Show the firewall rules",
 	RunE:  executeShowRules,
@@ -20,12 +20,12 @@ func executeShowRules(cmd *cobra.Command, args []string) error {
 	}
 
 	for _, rule := range table {
-		fmt.Println(rule.ToString())
+		fmt.Println(rule.String())
 	}
 
 	return nil
 }
 
 func init() {
-	RootCmd.AddCommand(showCmd)
+	RootCmd.AddCommand(showRulesCmd)
 }
