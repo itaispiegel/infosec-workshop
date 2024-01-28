@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/itaispiegel/infosec-workshop/user/pkg/fwtypes"
+	"github.com/itaispiegel/infosec-workshop/user/pkg/utils"
 )
 
 const (
@@ -75,38 +76,38 @@ func NewRule(
 func Unmarshal(data []byte) *Rule {
 	var rule Rule
 	reader := bytes.NewReader(data)
-	binary.Read(reader, binary.LittleEndian, &rule.Name)
-	binary.Read(reader, binary.LittleEndian, &rule.Direction)
-	binary.Read(reader, binary.BigEndian, &rule.SrcIp)
-	binary.Read(reader, binary.BigEndian, &rule.SrcPrefixMask)
-	binary.Read(reader, binary.LittleEndian, &rule.SrcPrefixSize)
-	binary.Read(reader, binary.BigEndian, &rule.DstIp)
-	binary.Read(reader, binary.BigEndian, &rule.DstPrefixMask)
-	binary.Read(reader, binary.LittleEndian, &rule.DstPrefixSize)
-	binary.Read(reader, binary.BigEndian, &rule.SrcPort)
-	binary.Read(reader, binary.BigEndian, &rule.DstPort)
-	binary.Read(reader, binary.LittleEndian, &rule.Protocol)
-	binary.Read(reader, binary.LittleEndian, &rule.Ack)
-	binary.Read(reader, binary.LittleEndian, &rule.Action)
+	utils.PanicIfError(binary.Read(reader, binary.LittleEndian, &rule.Name))
+	utils.PanicIfError(binary.Read(reader, binary.LittleEndian, &rule.Direction))
+	utils.PanicIfError(binary.Read(reader, binary.BigEndian, &rule.SrcIp))
+	utils.PanicIfError(binary.Read(reader, binary.BigEndian, &rule.SrcPrefixMask))
+	utils.PanicIfError(binary.Read(reader, binary.LittleEndian, &rule.SrcPrefixSize))
+	utils.PanicIfError(binary.Read(reader, binary.BigEndian, &rule.DstIp))
+	utils.PanicIfError(binary.Read(reader, binary.BigEndian, &rule.DstPrefixMask))
+	utils.PanicIfError(binary.Read(reader, binary.LittleEndian, &rule.DstPrefixSize))
+	utils.PanicIfError(binary.Read(reader, binary.BigEndian, &rule.SrcPort))
+	utils.PanicIfError(binary.Read(reader, binary.BigEndian, &rule.DstPort))
+	utils.PanicIfError(binary.Read(reader, binary.LittleEndian, &rule.Protocol))
+	utils.PanicIfError(binary.Read(reader, binary.LittleEndian, &rule.Ack))
+	utils.PanicIfError(binary.Read(reader, binary.LittleEndian, &rule.Action))
 	return &rule
 }
 
 // Marshals a rule to a byte slice.
 func (rule *Rule) Marshal() []byte {
 	buf := bytes.NewBuffer(nil)
-	binary.Write(buf, binary.LittleEndian, rule.Name)
-	binary.Write(buf, binary.LittleEndian, rule.Direction)
-	binary.Write(buf, binary.BigEndian, rule.SrcIp)
-	binary.Write(buf, binary.BigEndian, rule.SrcPrefixMask)
-	binary.Write(buf, binary.LittleEndian, rule.SrcPrefixSize)
-	binary.Write(buf, binary.BigEndian, rule.DstIp)
-	binary.Write(buf, binary.BigEndian, rule.DstPrefixMask)
-	binary.Write(buf, binary.LittleEndian, rule.DstPrefixSize)
-	binary.Write(buf, binary.BigEndian, rule.SrcPort)
-	binary.Write(buf, binary.BigEndian, rule.DstPort)
-	binary.Write(buf, binary.LittleEndian, rule.Protocol)
-	binary.Write(buf, binary.LittleEndian, rule.Ack)
-	binary.Write(buf, binary.LittleEndian, rule.Action)
+	utils.PanicIfError(binary.Write(buf, binary.LittleEndian, rule.Name))
+	utils.PanicIfError(binary.Write(buf, binary.LittleEndian, rule.Direction))
+	utils.PanicIfError(binary.Write(buf, binary.BigEndian, rule.SrcIp))
+	utils.PanicIfError(binary.Write(buf, binary.BigEndian, rule.SrcPrefixMask))
+	utils.PanicIfError(binary.Write(buf, binary.LittleEndian, rule.SrcPrefixSize))
+	utils.PanicIfError(binary.Write(buf, binary.BigEndian, rule.DstIp))
+	utils.PanicIfError(binary.Write(buf, binary.BigEndian, rule.DstPrefixMask))
+	utils.PanicIfError(binary.Write(buf, binary.LittleEndian, rule.DstPrefixSize))
+	utils.PanicIfError(binary.Write(buf, binary.BigEndian, rule.SrcPort))
+	utils.PanicIfError(binary.Write(buf, binary.BigEndian, rule.DstPort))
+	utils.PanicIfError(binary.Write(buf, binary.LittleEndian, rule.Protocol))
+	utils.PanicIfError(binary.Write(buf, binary.LittleEndian, rule.Ack))
+	utils.PanicIfError(binary.Write(buf, binary.LittleEndian, rule.Action))
 	return buf.Bytes()
 }
 
