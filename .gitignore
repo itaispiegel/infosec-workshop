@@ -17,3 +17,4 @@ modules.order
 .DS_Store
 
 user/user
+!user/go.mod
