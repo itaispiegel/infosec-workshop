@@ -28,8 +28,8 @@ static struct file_operations reset_logs_device_fops = {
 static ssize_t reset_logs_store(struct device *dev,
                                 struct device_attribute *attr, const char *buf,
                                 size_t count) {
-    if (count == 6 &&
-        strncmp(buf, "reset", 5) == 0) { // +1 for the null terminator
+    if (count == RESET_MAGIC_SIZE &&
+        strncmp(buf, RESET_MAGIC, RESET_MAGIC_SIZE) == 0) {
         struct log_entry *log_entry, *tmp;
         list_for_each_entry_safe(log_entry, tmp, &logs_list, list) {
             list_del(&log_entry->list);

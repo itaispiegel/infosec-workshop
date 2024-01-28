@@ -6,6 +6,9 @@
 
 #include "fw.h"
 
+#define RESET_MAGIC "reset"
+#define RESET_MAGIC_SIZE sizeof(RESET_MAGIC)
+
 extern struct list_head logs_list;
 extern size_t logs_count;
 
