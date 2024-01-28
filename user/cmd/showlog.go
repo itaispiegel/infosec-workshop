@@ -1,8 +1,6 @@
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/itaispiegel/infosec-workshop/user/pkg/logs"
 	"github.com/spf13/cobra"
 )
@@ -19,7 +17,7 @@ func executeShowLog(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	fmt.Println(logs.String())
+	logs.Table().Print()
 	return nil
 }
 

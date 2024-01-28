@@ -1,8 +1,10 @@
 package logs
 
 import (
+	"net"
 	"os"
-	"strings"
+
+	"github.com/rodaine/table"
 )
 
 type logsSlice []Log
@@ -42,18 +44,20 @@ func ClearLogsDevice() error {
 	return err
 }
 
-func (logs *logsSlice) String() string {
-	sb := strings.Builder{}
-	// TODO is it okay that the headers are capitalized?
-	sb.WriteString(
-		"Timestamp           " +
-			"SrcIP    " +
-			"DstIP   " +
-			"SrcPort DstPort  Protocol Action Reason Count",
-	)
-
+func (logs *logsSlice) Table() table.Table {
+	tbl := table.New("Timestamp", "SrcIP", "DstIP", "SrcPort", "DstPort", "Protocol", "Action", "Reason", "Count")
 	for _, log := range *logs {
-		sb.WriteString("\n" + log.ToString())
+		tbl.AddRow(
+			log.Timestamp.Format(logsDateTimeFormat),
+			net.IP(log.SrcIp[:]),
+			net.IP(log.DstIp[:]),
+			log.SrcPort,
+			log.DstPort,
+			log.Protocol,
+			log.Action,
+			log.Reason,
+			log.Count,
+		)
 	}
-	return sb.String()
+	return tbl
 }
