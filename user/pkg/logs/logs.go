@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/itaispiegel/infosec-workshop/user/pkg/fwtypes"
+	"github.com/itaispiegel/infosec-workshop/user/pkg/utils"
 )
 
 const (
@@ -52,16 +53,17 @@ func Unmarshal(data []byte) *Log {
 		timestamp uint32
 		log       Log
 	)
+
 	reader := bytes.NewReader(data)
-	binary.Read(reader, binary.LittleEndian, &timestamp)
-	binary.Read(reader, binary.LittleEndian, &log.Protocol)
-	binary.Read(reader, binary.LittleEndian, &log.Action)
-	binary.Read(reader, binary.BigEndian, &log.SrcIp)
-	binary.Read(reader, binary.BigEndian, &log.DstIp)
-	binary.Read(reader, binary.BigEndian, &log.SrcPort)
-	binary.Read(reader, binary.BigEndian, &log.DstPort)
-	binary.Read(reader, binary.LittleEndian, &log.Reason)
-	binary.Read(reader, binary.LittleEndian, &log.Count)
+	utils.PanicIfError(binary.Read(reader, binary.LittleEndian, &timestamp))
+	utils.PanicIfError(binary.Read(reader, binary.LittleEndian, &log.Protocol))
+	utils.PanicIfError(binary.Read(reader, binary.LittleEndian, &log.Action))
+	utils.PanicIfError(binary.Read(reader, binary.BigEndian, &log.SrcIp))
+	utils.PanicIfError(binary.Read(reader, binary.BigEndian, &log.DstIp))
+	utils.PanicIfError(binary.Read(reader, binary.BigEndian, &log.SrcPort))
+	utils.PanicIfError(binary.Read(reader, binary.BigEndian, &log.DstPort))
+	utils.PanicIfError(binary.Read(reader, binary.LittleEndian, &log.Reason))
+	utils.PanicIfError(binary.Read(reader, binary.LittleEndian, &log.Count))
 	log.Timestamp = time.Unix(int64(timestamp), 0)
 	return &log
 }
