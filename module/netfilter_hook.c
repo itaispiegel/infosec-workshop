@@ -99,8 +99,7 @@ static inline struct ports_tuple ports_from_skb(struct sk_buff *skb) {
     struct ports_tuple p;
     struct iphdr *ip_header = ip_hdr(skb);
 
-    // TODO what happens if the ports are >1023?
-    // should we store the specific port or PORT_ABOVE_1023?
+    // Note that we the store the exact ports, even if they're above 1023.
     if (ip_header->protocol == PROT_UDP) {
         p.sport = udp_hdr(skb)->source;
         p.dport = udp_hdr(skb)->dest;
@@ -160,7 +159,7 @@ static void update_log_entry_by_matching_rule(rule_t *rule, reason_t reason) {
 
     printk(KERN_INFO "Creating a new log entry for rule #%d\n", reason);
     log_entry = kmalloc(sizeof(struct log_entry), GFP_KERNEL);
-    if (log_entry == NULL) { // TODO decide what to do here
+    if (log_entry == NULL) {
         printk(KERN_WARNING
                "Failed to allocate memory for log entry, so ignoring it\n");
         return;
@@ -199,7 +198,7 @@ static void update_log_entry_by_skb(struct sk_buff *skb, reason_t reason) {
     printk(KERN_INFO
            "Creating a new log entry for skb without a matching rule\n");
     log_entry = kmalloc(sizeof(struct log_entry), GFP_KERNEL);
-    if (log_entry == NULL) { // TODO decide what to do here
+    if (log_entry == NULL) {
         printk(KERN_WARNING
                "Failed to allocate memory for log entry, so ignoring it\n");
         return;
