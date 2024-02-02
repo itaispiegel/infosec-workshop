@@ -83,20 +83,6 @@ static inline bool log_match_rule(log_row_t *log_row, rule_t *rule) {
            log_row->dst_port == rule->dst_port;
 }
 
-static inline log_row_t new_log_row_by_rule(rule_t *rule, reason_t reason) {
-    return (log_row_t){
-        .timestamp = ktime_get_real_seconds(),
-        .protocol = rule->protocol,
-        .action = rule->action,
-        .src_ip = rule->src_ip,
-        .dst_ip = rule->dst_ip,
-        .src_port = rule->src_port,
-        .dst_port = rule->dst_port,
-        .reason = reason,
-        .count = 1,
-    };
-}
-
 static inline log_row_t new_log_row_by_packet(packet_t *packet,
                                               reason_t reason) {
     return (log_row_t){
@@ -110,31 +96,6 @@ static inline log_row_t new_log_row_by_packet(packet_t *packet,
         .reason = reason,
         .count = 1,
     };
-}
-
-static void update_log_entry_by_matching_rule(rule_t *rule, reason_t reason) {
-    struct log_entry *log_entry;
-    struct list_head *pos;
-    list_for_each(pos, &logs_list) {
-        log_entry = list_entry(pos, struct log_entry, list);
-        if (log_entry->log_row.reason == reason) {
-            log_entry->log_row.count++;
-            log_entry->log_row.timestamp = ktime_get_real_seconds();
-            return;
-        }
-    }
-
-    printk(KERN_INFO "Creating a new log entry for rule #%d\n", reason);
-    log_entry = kmalloc(sizeof(struct log_entry), GFP_KERNEL);
-    if (log_entry == NULL) {
-        printk(KERN_WARNING
-               "Failed to allocate memory for log entry, so ignoring it\n");
-        return;
-    }
-
-    log_entry->log_row = new_log_row_by_rule(rule, reason);
-    list_add_tail(&log_entry->list, &logs_list);
-    logs_count++;
 }
 
 static bool log_entry_matches_packet(struct log_entry *log_entry,
@@ -159,8 +120,7 @@ static void update_log_entry_by_packet(packet_t *packet, reason_t reason) {
         }
     }
 
-    printk(KERN_INFO
-           "Creating a new log entry for skb without a matching rule\n");
+    printk(KERN_INFO "Creating a new log entry for packet\n");
     log_entry = kmalloc(sizeof(struct log_entry), GFP_KERNEL);
     if (log_entry == NULL) {
         printk(KERN_WARNING
@@ -192,7 +152,7 @@ static unsigned int forward_hook_func(void *priv, struct sk_buff *skb,
     // In this case the packet must be a normal packet.
     for (i = 0; i < rules_count; i++) {
         if (match_rule_packet(&rules[i], &packet)) {
-            update_log_entry_by_matching_rule(&rules[i], i);
+            update_log_entry_by_packet(&packet, i);
             return rules[i].action;
         }
     }
