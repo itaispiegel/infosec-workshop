@@ -20,7 +20,7 @@ If the target does not respond, then the port is open.
 def send_xmas_packet(target_ip: str, target_port: int):
     xmas_packet = IP(dst=target_ip) / TCP(dport=target_port, flags="FPU")
     send(xmas_packet, verbose=0)
-    print("XMAS packet sent to: " + "{0}:{1}".format(target_ip, target_port))
+    print("XMAS packet sent to: {0}:{1}".format(target_ip, target_port))
 
 
 if __name__ == "__main__":
