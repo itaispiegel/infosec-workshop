@@ -6,6 +6,9 @@
 #include "logs.h"
 #include "netfilter_hook.h"
 
+const __be32 LOOPBACK_PREFIX = 0x7f000000;
+const __be32 LOOPBACK_MASK = 0xff000000;
+
 extern struct list_head logs_list;
 extern size_t logs_count;
 
@@ -25,6 +28,29 @@ static const struct nf_hook_ops forward_hook = {
     .pf = NFPROTO_IPV4,
     .hooknum = NF_INET_FORWARD,
 };
+
+static inline bool is_loopback_addr(__be32 addr) {
+    return (addr & LOOPBACK_MASK) == LOOPBACK_PREFIX;
+}
+
+static inline bool is_loopback_skb(struct sk_buff *skb) {
+    struct iphdr *ip_header = ip_hdr(skb);
+    return is_loopback_addr(ip_header->saddr) ||
+           is_loopback_addr(ip_header->daddr);
+}
+
+static inline bool is_unhandled_protocol_skb(struct sk_buff *skb) {
+    struct iphdr *ip_header = ip_hdr(skb);
+    return ip_header->protocol != PROT_TCP && ip_header->protocol != PROT_UDP &&
+           ip_header->protocol != PROT_ICMP;
+}
+
+static inline bool is_xmas_skb(struct sk_buff *skb) {
+    struct iphdr *ip_header = ip_hdr(skb);
+    struct tcphdr *tcp_header = tcp_hdr(skb);
+    return ip_header->protocol == PROT_TCP &&
+           (tcp_header->fin && tcp_header->urg && tcp_header->psh);
+}
 
 static inline bool match_direction(rule_t *rule, struct sk_buff *skb) {
     // This is a bit confusing, but the packets going outside are received
@@ -212,6 +238,15 @@ static void update_log_entry_by_skb(struct sk_buff *skb, reason_t reason) {
 static unsigned int forward_hook_func(void *priv, struct sk_buff *skb,
                                       const struct nf_hook_state *state) {
     __u8 i;
+    if (is_loopback_skb(skb)) {
+        return NF_ACCEPT;
+    } else if (is_unhandled_protocol_skb(skb)) {
+        return NF_ACCEPT;
+    } else if (is_xmas_skb(skb)) {
+        update_log_entry_by_skb(skb, REASON_XMAS_PACKET);
+        return NF_DROP;
+    }
+
     for (i = 0; i < rules_count; i++) {
         if (match_rule_skb(&rules[i], skb)) {
             update_log_entry_by_matching_rule(&rules[i], i);
@@ -219,9 +254,6 @@ static unsigned int forward_hook_func(void *priv, struct sk_buff *skb,
         }
     }
 
-    // TODO handle XMAS packets
-    // TODO accept any non TCP, UDP and ICMP and IPv6 packets without logging
-    // TODOD Accept any loopback packet without logging
     update_log_entry_by_skb(skb, REASON_NO_MATCHING_RULE);
     return FW_POLICY;
 }
