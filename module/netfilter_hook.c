@@ -35,6 +35,7 @@ static inline bool match_direction(rule_t *rule, packet_t *packet) {
 static inline bool match_rule_ports(__be16 rule_port, __be16 skb_port) {
     // The port numbers are in big endian, so we need to convert them to host
     // byte order.
+    // Notice that we assume non UDP and non TCP packets have 0 as their ports.
     return (rule_port == PORT_ANY || rule_port == skb_port ||
             (rule_port == PORT_ABOVE_1023_BE && be16_to_cpu(skb_port) > 1023));
 }
@@ -51,12 +52,8 @@ static inline bool match_ip_addrs(rule_t *rule, packet_t *packet) {
 }
 
 static inline bool match_ports(rule_t *rule, packet_t *packet) {
-    return (rule->protocol == PROT_UDP &&
-            match_rule_ports(rule->src_port, packet->src_port) &&
-            match_rule_ports(rule->dst_port, packet->dst_port)) ||
-           (rule->protocol == PROT_TCP &&
-            match_rule_ports(rule->src_port, packet->src_port) &&
-            match_rule_ports(rule->dst_port, packet->dst_port));
+    return match_rule_ports(rule->src_port, packet->src_port) &&
+           match_rule_ports(rule->dst_port, packet->dst_port);
 }
 
 static inline bool match_protocol(rule_t *rule, packet_t *packet) {
