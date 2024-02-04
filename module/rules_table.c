@@ -13,8 +13,10 @@ static struct file_operations fops = {
 static ssize_t rules_table_show(struct device *dev,
                                 struct device_attribute *attr, char *buf) {
     __u8 i;
+    __u16 offset = 0;
     for (i = 0; i < rules_count; i++) {
-        memcpy(buf + i * sizeof(rule_t), &rules[i], sizeof(rule_t));
+        memcpy(buf + offset, &rules[i], sizeof(rule_t));
+        offset += sizeof(rule_t);
     }
 
     return rules_count * sizeof(rule_t);
@@ -24,12 +26,15 @@ static ssize_t rules_table_store(struct device *dev,
                                  struct device_attribute *attr, const char *buf,
                                  size_t count) {
 
-    if (count > MAX_RULES * sizeof(rule_t)) {
+    // Writing a single NULL byte to the table will reset it.
+    if (count == 1 && *buf == 0) {
+        memset(rules, 0, sizeof(rules));
+        rules_count = 0;
+        return count;
+    } else if (count > MAX_RULES * sizeof(rule_t)) {
         printk(KERN_WARNING "Can't save rules, since the size is too big\n");
         return -EINVAL;
-    }
-
-    if (count % sizeof(rule_t) != 0) {
+    } else if (count % sizeof(rule_t) != 0) {
         printk(KERN_WARNING "Can't save rules, since the size is invalid\n");
         return -EINVAL;
     }
