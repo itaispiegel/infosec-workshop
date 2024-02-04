@@ -10,6 +10,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const (
+	commentPrefix = "#" // Lines starting with this prefix are considered comments
+)
+
 var loadCmd = &cobra.Command{
 	Use:   "load_rules [rules_file]",
 	Short: "Load the firewall rules from a given file",
@@ -25,6 +29,11 @@ func executeLoadRules(cmd *cobra.Command, args []string) error {
 	}
 
 	rulesLines := utils.SplitLines(strings.TrimSpace(string(rulesBytes)))
+	rulesLines = utils.RemoveLinesWithPrefix(rulesLines, commentPrefix)
+	if len(rulesLines) == 0 {
+		return rulestable.ClearTable()
+	}
+
 	newRules := make([]rules.Rule, len(rulesLines))
 	for i, ruleLine := range rulesLines {
 		rule, err := rules.ParseRule(ruleLine)

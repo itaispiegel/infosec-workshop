@@ -19,7 +19,7 @@ from scapy.all import IP, TCP, UDP, send
 @click.option(
     "--protocol", prompt=True, type=click.Choice(["tcp", "udp"]), default="tcp"
 )
-def send_tcp_packet(target_ip: str, target_port: int, source_port: int, protocol: str):
+def send_packet(target_ip: str, target_port: int, source_port: int, protocol: str):
     transport_layer = None
     if protocol == "tcp":
         transport_layer = TCP(dport=target_port)
@@ -37,4 +37,4 @@ def send_tcp_packet(target_ip: str, target_port: int, source_port: int, protocol
 
 
 if __name__ == "__main__":
-    send_tcp_packet()
+    send_packet()

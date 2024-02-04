@@ -9,6 +9,8 @@ import (
 	"github.com/itaispiegel/infosec-workshop/user/pkg/fwtypes"
 )
 
+var ErrInvalidRuleFormat = errors.New("invalid rule format")
+
 func parseCidr(cidr string) (net.IP, net.IPMask, error) {
 	if cidr == "any" {
 		return net.IPv4(0, 0, 0, 0), net.CIDRMask(0, 32), nil
@@ -38,7 +40,7 @@ func parsePort(port string) (uint16, error) {
 func ParseRule(ruleLine string) (*Rule, error) {
 	fields := strings.Split(ruleLine, " ")
 	if len(fields) != 9 {
-		return &Rule{}, errors.New("invalid rule format")
+		return &Rule{}, ErrInvalidRuleFormat
 	}
 
 	name := fields[0]

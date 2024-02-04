@@ -19,18 +19,12 @@ func SaveRules(rules []rules.Rule) error {
 		buf = append(buf, rule.Marshal()...)
 	}
 
-	f, err := os.OpenFile(RuleTableDeviceFile, os.O_WRONLY, 0)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
+	return writeToRulesTable(buf)
+}
 
-	_, err = f.Write(buf)
-	if err != nil {
-		return err
-	}
-
-	return nil
+// Clears the firewall rule table.
+func ClearTable() error {
+	return writeToRulesTable([]byte{0})
 }
 
 // Reads the rule table from the firewall rule table device file, and returns it.
@@ -46,4 +40,19 @@ func ReadRules() ([]rules.Rule, error) {
 	}
 
 	return table, nil
+}
+
+func writeToRulesTable(buf []byte) error {
+	f, err := os.OpenFile(RuleTableDeviceFile, os.O_WRONLY, 0)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	_, err = f.Write(buf)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

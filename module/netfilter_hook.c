@@ -95,8 +95,8 @@ static inline log_row_t new_log_row_by_packet(packet_t *packet,
     };
 }
 
-static bool log_entry_matches_packet(struct log_entry *log_entry,
-                                     packet_t *packet) {
+static inline bool log_entry_matches_packet(struct log_entry *log_entry,
+                                            packet_t *packet) {
     return log_entry->log_row.protocol == packet->protocol &&
            log_entry->log_row.src_ip == packet->src_ip &&
            log_entry->log_row.dst_ip == packet->dst_ip &&
