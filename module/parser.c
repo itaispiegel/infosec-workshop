@@ -25,7 +25,7 @@ void parse_packet(packet_t *packet, struct sk_buff *skb) {
 
     packet->protocol = ip_header->protocol;
 
-    // Noteice that we the store the exact ports, even if they're above 1023.
+    // Notice that we the store the exact ports, even if they're above 1023.
     if (packet->protocol == PROT_TCP) {
         tcp_header = tcp_hdr(skb);
         packet->src_port = tcp_header->source;
