@@ -18,8 +18,7 @@ static ssize_t rules_table_show(struct device *dev,
         memcpy(buf + offset, &rules[i], sizeof(rule_t));
         offset += sizeof(rule_t);
     }
-
-    return rules_count * sizeof(rule_t);
+    return offset;
 }
 
 static ssize_t rules_table_store(struct device *dev,

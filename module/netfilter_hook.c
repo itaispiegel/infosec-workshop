@@ -6,6 +6,7 @@
 #include "logs.h"
 #include "netfilter_hook.h"
 #include "parser.h"
+#include "tcp_conntrack.h"
 
 extern struct list_head logs_list;
 extern size_t logs_count;
@@ -132,7 +133,7 @@ static void update_log_entry_by_packet(packet_t *packet, reason_t reason) {
 
 static unsigned int forward_hook_func(void *priv, struct sk_buff *skb,
                                       const struct nf_hook_state *state) {
-    __u8 i;
+    __u8 i, verdict;
     packet_t packet;
 
     parse_packet(&packet, skb);
@@ -150,7 +151,11 @@ static unsigned int forward_hook_func(void *priv, struct sk_buff *skb,
     for (i = 0; i < rules_count; i++) {
         if (match_rule_packet(&rules[i], &packet)) {
             update_log_entry_by_packet(&packet, i);
-            return rules[i].action;
+            verdict = rules[i].action;
+            if (verdict == NF_ACCEPT && packet.protocol == PROT_TCP) {
+                update_connection(packet, tcp_hdr(skb));
+            }
+            return verdict;
         }
     }
 

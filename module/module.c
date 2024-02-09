@@ -1,6 +1,7 @@
 #include "logs.h"
 #include "netfilter_hook.h"
 #include "rules_table.h"
+#include "tcp_conntrack.h"
 
 MODULE_AUTHOR("Itai Spiegel");
 MODULE_LICENSE("GPL");
@@ -33,9 +34,16 @@ static int __init init(void) {
         goto destroy_reset_logs_device;
     }
 
+    if (init_tcp_conntrack(fw_sysfs_class) < 0) {
+        printk(KERN_ERR "Failed to initialize TCP conntrack\n");
+        goto destroy_netfilter_hook;
+    }
+
     printk(KERN_INFO "Firewall loaded\n");
     return 0;
 
+destroy_netfilter_hook:
+    destroy_netfilter_hook();
 destroy_reset_logs_device:
     destroy_reset_logs_device(fw_sysfs_class);
 destroy_show_logs_device:
@@ -48,6 +56,7 @@ class_destroy:
 }
 
 static void __exit exit(void) {
+    destroy_tcp_conntrack(fw_sysfs_class);
     destroy_netfilter_hook();
     destroy_reset_logs_device(fw_sysfs_class);
     destroy_show_logs_device(fw_sysfs_class);
