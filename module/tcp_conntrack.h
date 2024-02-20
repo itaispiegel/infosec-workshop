@@ -30,7 +30,9 @@ struct tcp_connection_node {
 
 __u32 hash_conn_addrs(struct socket_address *saddr,
                       struct socket_address *daddr);
-void update_connection(packet_t packet, struct tcphdr *tcp_header);
+void track_connection(packet_t *packet, struct tcphdr *tcp_header);
+bool match_connection_and_update_state(packet_t packet,
+                                       struct tcphdr *tcp_header);
 int init_tcp_conntrack(struct class *fw_sysfs_class);
 void destroy_tcp_conntrack(struct class *fw_sysfs_class);
 

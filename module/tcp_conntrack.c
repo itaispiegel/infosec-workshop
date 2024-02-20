@@ -130,10 +130,9 @@ static void tcp_fsm_step(struct tcp_connection *conn,
     }
 }
 
-static inline bool init_conn(struct socket_address saddr,
-                             struct socket_address daddr,
-                             struct tcphdr *tcp_header, __u32 hash,
-                             enum connection_direction direction) {
+bool init_connection(struct socket_address saddr, struct socket_address daddr,
+                     struct tcphdr *tcp_header, __u32 hash,
+                     enum connection_direction direction) {
     struct tcp_connection_node *conn =
         kmalloc(sizeof(struct tcp_connection_node), GFP_KERNEL);
     if (!conn) {
@@ -161,7 +160,50 @@ __u32 hash_conn_addrs(struct socket_address *saddr,
                   4, 0);
 }
 
-void update_connection(packet_t packet, struct tcphdr *tcp_header) {
+void track_connection(packet_t *packet, struct tcphdr *tcp_header) {
+    struct tcp_connection_node *conn, *inverse_conn;
+    struct socket_address saddr = {.addr = packet->src_ip,
+                                   .port = packet->src_port};
+    struct socket_address daddr = {.addr = packet->dst_ip,
+                                   .port = packet->dst_port};
+    __u32 hash = hash_conn_addrs(&saddr, &daddr);
+    __u32 inverse_hash = hash_conn_addrs(&daddr, &saddr);
+
+    conn = kmalloc(sizeof(struct tcp_connection_node), GFP_KERNEL);
+    if (!conn) {
+        printk(KERN_ERR "Failed to allocate memory for connection\n");
+        return;
+    }
+
+    conn->conn = (struct tcp_connection){
+        .state = TCP_CLOSE,
+        .saddr = saddr,
+        .daddr = daddr,
+    };
+    tcp_fsm_step(&conn->conn, OUTGOING, tcp_header);
+    hash_add(tcp_connections, &conn->node, hash);
+    printk(KERN_DEBUG "Tracking new TCP connection %u:%u --> %u:%u\n",
+           saddr.addr, saddr.port, daddr.addr, daddr.port);
+
+    inverse_conn = kmalloc(sizeof(struct tcp_connection_node), GFP_KERNEL);
+    if (!inverse_conn) {
+        printk(KERN_ERR "Failed to allocate memory for connection\n");
+        return;
+    }
+
+    inverse_conn->conn = (struct tcp_connection){
+        .state = TCP_CLOSE,
+        .saddr = daddr,
+        .daddr = saddr,
+    };
+    tcp_fsm_step(&inverse_conn->conn, INCOMING, tcp_header);
+    hash_add(tcp_connections, &inverse_conn->node, inverse_hash);
+    printk(KERN_DEBUG "Tracking new TCP connection %u:%u --> %u:%u\n",
+           daddr.addr, daddr.port, saddr.addr, saddr.port);
+}
+
+bool match_connection_and_update_state(packet_t packet,
+                                       struct tcphdr *tcp_header) {
     struct socket_address saddr = {.addr = packet.src_ip,
                                    .port = packet.src_port};
     struct socket_address daddr = {.addr = packet.dst_ip,
@@ -175,7 +217,10 @@ void update_connection(packet_t packet, struct tcphdr *tcp_header) {
         if (match_conn_addrs(&conn->conn, &saddr, &daddr)) {
             tcp_fsm_step(&conn->conn, OUTGOING, tcp_header);
             if (conn->conn.state == TCP_CLOSE) {
-                printk(KERN_DEBUG "Removing closed connection from table\n");
+                printk(
+                    KERN_DEBUG
+                    "Removing closed connection from table %u:%u --> %u:%u\n",
+                    saddr.addr, saddr.port, daddr.addr, daddr.port);
                 close_connection(conn);
             }
             matched = true;
@@ -186,21 +231,17 @@ void update_connection(packet_t packet, struct tcphdr *tcp_header) {
         if (match_conn_addrs(&conn->conn, &daddr, &saddr)) {
             tcp_fsm_step(&conn->conn, INCOMING, tcp_header);
             if (conn->conn.state == TCP_CLOSE) {
-                printk(KERN_DEBUG "Removing closed connection from table\n");
+                printk(
+                    KERN_DEBUG
+                    "Removing closed connection from table %u:%u --> %u:%u\n",
+                    daddr.addr, daddr.port, saddr.addr, saddr.port);
                 close_connection(conn);
             }
             matched = true;
         }
     }
 
-    if (!matched) {
-        if (!init_conn(saddr, daddr, tcp_header, hash, OUTGOING)) {
-            return;
-        }
-        if (!init_conn(daddr, saddr, tcp_header, inverse_hash, INCOMING)) {
-            return;
-        }
-    }
+    return matched;
 }
 
 int init_tcp_conntrack(struct class *fw_sysfs_class) {
