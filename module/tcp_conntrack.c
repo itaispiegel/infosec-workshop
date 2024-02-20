@@ -83,13 +83,15 @@ static void tcp_fsm_step(struct tcp_connection *conn,
             break;
         case TCP_FIN_WAIT2:
             if (tcp_header->fin) {
-                conn->state = TCP_TIME_WAIT;
+                conn->state = TCP_CLOSE; // Originally this goes to TIME_WAIT,
+                                         // but we don't handle this state
                 return;
             }
             break;
         case TCP_CLOSING:
             if (tcp_header->ack) {
-                conn->state = TCP_TIME_WAIT;
+                conn->state = TCP_CLOSE; // Originally this goes to TIME_WAIT,
+                                         // but we don't handle this state
                 return;
             }
             break;
