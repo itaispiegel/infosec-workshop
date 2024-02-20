@@ -81,12 +81,12 @@ static inline bool log_match_rule(log_row_t *log_row, rule_t *rule) {
            log_row->dst_port == rule->dst_port;
 }
 
-static inline log_row_t new_log_row_by_packet(packet_t *packet,
-                                              reason_t reason) {
+static inline log_row_t new_log_row_by_packet(packet_t *packet, reason_t reason,
+                                              __u8 verdict) {
     return (log_row_t){
         .timestamp = ktime_get_real_seconds(),
         .protocol = packet->protocol,
-        .action = FW_POLICY,
+        .action = verdict,
         .src_ip = packet->src_ip,
         .dst_ip = packet->dst_ip,
         .src_port = packet->src_port,
@@ -105,7 +105,8 @@ static inline bool log_entry_matches_packet(struct log_entry *log_entry,
            log_entry->log_row.dst_port == packet->dst_port;
 }
 
-static void update_log_entry_by_packet(packet_t *packet, reason_t reason) {
+static void update_log_entry_by_packet(packet_t *packet, reason_t reason,
+                                       __u8 verdict) {
     struct log_entry *log_entry;
     struct list_head *pos;
     list_for_each(pos, &logs_list) {
@@ -126,7 +127,7 @@ static void update_log_entry_by_packet(packet_t *packet, reason_t reason) {
         return;
     }
 
-    log_entry->log_row = new_log_row_by_packet(packet, reason);
+    log_entry->log_row = new_log_row_by_packet(packet, reason, verdict);
     list_add_tail(&log_entry->list, &logs_list);
     logs_count++;
 }
@@ -143,15 +144,15 @@ static unsigned int forward_hook_func(void *priv, struct sk_buff *skb,
         // In this case we want to accept the packet without logging it.
         return NF_ACCEPT;
     } else if (packet.type == PACKET_TYPE_XMAS) {
-        update_log_entry_by_packet(&packet, REASON_XMAS_PACKET);
+        update_log_entry_by_packet(&packet, REASON_XMAS_PACKET, NF_DROP);
         return NF_DROP;
     }
 
     // In this case the packet must be a normal packet.
     for (i = 0; i < rules_count; i++) {
         if (match_rule_packet(&rules[i], &packet)) {
-            update_log_entry_by_packet(&packet, i);
             verdict = rules[i].action;
+            update_log_entry_by_packet(&packet, i, verdict);
             if (verdict == NF_ACCEPT && packet.protocol == PROT_TCP) {
                 update_connection(packet, tcp_hdr(skb));
             }
@@ -159,7 +160,7 @@ static unsigned int forward_hook_func(void *priv, struct sk_buff *skb,
         }
     }
 
-    update_log_entry_by_packet(&packet, REASON_NO_MATCHING_RULE);
+    update_log_entry_by_packet(&packet, REASON_NO_MATCHING_RULE, FW_POLICY);
     return FW_POLICY;
 }
 
