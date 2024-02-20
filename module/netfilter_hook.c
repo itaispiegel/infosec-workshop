@@ -136,6 +136,7 @@ static unsigned int forward_hook_func(void *priv, struct sk_buff *skb,
                                       const struct nf_hook_state *state) {
     __u8 i, verdict;
     packet_t packet;
+    bool matched;
 
     parse_packet(&packet, skb);
 
@@ -148,13 +149,18 @@ static unsigned int forward_hook_func(void *priv, struct sk_buff *skb,
         return NF_DROP;
     }
 
-    // In this case the packet must be a normal packet.
+    // In these cases, the packet must be a normal packet.
+    if (packet.protocol == PROT_TCP && packet.ack) {
+        matched = match_connection_and_update_state(packet, tcp_hdr(skb));
+        return NF_ACCEPT ? matched : NF_DROP;
+    }
+
     for (i = 0; i < rules_count; i++) {
         if (match_rule_packet(&rules[i], &packet)) {
             verdict = rules[i].action;
             update_log_entry_by_packet(&packet, i, verdict);
             if (verdict == NF_ACCEPT && packet.protocol == PROT_TCP) {
-                update_connection(packet, tcp_hdr(skb));
+                track_connection(&packet, tcp_hdr(skb));
             }
             return verdict;
         }
