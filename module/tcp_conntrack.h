@@ -28,7 +28,7 @@ struct tcp_connection_node {
     struct hlist_node node;
 };
 
-__u64 hash_conn_addrs(struct socket_address *saddr,
+__u32 hash_conn_addrs(struct socket_address *saddr,
                       struct socket_address *daddr);
 void update_connection(packet_t packet, struct tcphdr *tcp_header);
 int init_tcp_conntrack(struct class *fw_sysfs_class);

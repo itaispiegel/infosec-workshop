@@ -1,5 +1,6 @@
 #include "tcp_conntrack.h"
 
+#include <linux/jhash.h>
 #include <linux/siphash.h>
 #include <net/netfilter/nf_conntrack_tuple.h>
 
@@ -28,18 +29,11 @@ static ssize_t conns_table_show(struct device *dev,
 
 static DEVICE_ATTR(conns, S_IRUSR | S_IWUSR, conns_table_show, NULL);
 
-static inline enum connection_direction
-match_conn_direction(struct tcp_connection *conn, struct socket_address *saddr,
-                     struct socket_address *daddr) {
-    if (conn->saddr.addr == saddr->addr && conn->saddr.port == saddr->port &&
-        conn->daddr.addr == daddr->addr && conn->daddr.port == daddr->port) {
-        return OUTGOING;
-    }
-    if (conn->saddr.addr == daddr->addr && conn->saddr.port == daddr->port &&
-        conn->daddr.addr == saddr->addr && conn->daddr.port == saddr->port) {
-        return INCOMING;
-    }
-    return NONE;
+static inline bool match_conn_addrs(struct tcp_connection *conn,
+                                    struct socket_address *saddr,
+                                    struct socket_address *daddr) {
+    return conn->saddr.addr == saddr->addr && conn->saddr.port == saddr->port &&
+           conn->daddr.addr == daddr->addr && conn->daddr.port == daddr->port;
 }
 
 static void tcp_fsm_step(struct tcp_connection *conn,
@@ -114,6 +108,12 @@ static void tcp_fsm_step(struct tcp_connection *conn,
                 return;
             }
             break;
+        case TCP_SYN_RECV:
+            if (tcp_header->syn && tcp_header->ack) {
+                conn->state = TCP_ESTABLISHED;
+                return;
+            }
+            break;
         case TCP_ESTABLISHED:
             if (tcp_header->fin) {
                 conn->state = TCP_FIN_WAIT1;
@@ -130,9 +130,35 @@ static void tcp_fsm_step(struct tcp_connection *conn,
     }
 }
 
-__u64 hash_conn_addrs(struct socket_address *saddr,
+static inline bool init_conn(struct socket_address saddr,
+                             struct socket_address daddr,
+                             struct tcphdr *tcp_header, __u32 hash,
+                             enum connection_direction direction) {
+    struct tcp_connection_node *conn =
+        kmalloc(sizeof(struct tcp_connection_node), GFP_KERNEL);
+    if (!conn) {
+        return false;
+    }
+
+    conn->conn = (struct tcp_connection){
+        .state = TCP_CLOSE,
+        .saddr = saddr,
+        .daddr = daddr,
+    };
+    tcp_fsm_step(&conn->conn, direction, tcp_header);
+    hash_add(tcp_connections, &conn->node, hash);
+    return true;
+}
+
+static inline void close_connection(struct tcp_connection_node *conn) {
+    hash_del(&conn->node);
+    kfree(conn);
+}
+
+__u32 hash_conn_addrs(struct socket_address *saddr,
                       struct socket_address *daddr) {
-    return 0; // TODO: Implement
+    return jhash2((u32[4]){saddr->addr, saddr->port, daddr->addr, daddr->port},
+                  4, 0);
 }
 
 void update_connection(packet_t packet, struct tcphdr *tcp_header) {
@@ -141,57 +167,44 @@ void update_connection(packet_t packet, struct tcphdr *tcp_header) {
     struct socket_address daddr = {.addr = packet.dst_ip,
                                    .port = packet.dst_port};
     struct tcp_connection_node *conn;
-    enum connection_direction direction;
     bool matched = false;
-    __u64 hash = hash_conn_addrs(&saddr, &daddr);
+    __u32 hash = hash_conn_addrs(&saddr, &daddr);
+    __u32 inverse_hash = hash_conn_addrs(&daddr, &saddr);
+
     hash_for_each_possible(tcp_connections, conn, node, hash) {
-        direction = match_conn_direction(&conn->conn, &saddr, &daddr);
-        if (direction != NONE) {
-            tcp_fsm_step(&conn->conn, direction, tcp_header);
+        if (match_conn_addrs(&conn->conn, &saddr, &daddr)) {
+            tcp_fsm_step(&conn->conn, OUTGOING, tcp_header);
             if (conn->conn.state == TCP_CLOSE) {
                 printk(KERN_DEBUG "Removing closed connection from table\n");
-                hash_del(&conn->node);
-                kfree(conn);
+                close_connection(conn);
             }
             matched = true;
         }
     }
 
-    if (matched) {
-        return;
+    hash_for_each_possible(tcp_connections, conn, node, inverse_hash) {
+        if (match_conn_addrs(&conn->conn, &daddr, &saddr)) {
+            tcp_fsm_step(&conn->conn, INCOMING, tcp_header);
+            if (conn->conn.state == TCP_CLOSE) {
+                printk(KERN_DEBUG "Removing closed connection from table\n");
+                close_connection(conn);
+            }
+            matched = true;
+        }
     }
 
-    conn = kmalloc(sizeof(struct tcp_connection_node), GFP_KERNEL);
-    if (!conn) {
-        printk(KERN_ERR
-               "Failed to allocate memory for new TCP connection, skipping\n");
-        return;
+    if (!matched) {
+        if (!init_conn(saddr, daddr, tcp_header, hash, OUTGOING)) {
+            return;
+        }
+        if (!init_conn(daddr, saddr, tcp_header, inverse_hash, INCOMING)) {
+            return;
+        }
     }
-
-    conn->conn.state = TCP_CLOSE;
-    conn->conn.saddr = saddr;
-    conn->conn.daddr = daddr;
-    tcp_fsm_step(&conn->conn, OUTGOING, tcp_header);
-    hash_add(tcp_connections, &conn->node, hash);
-
-    // Add inverse connection
-    conn = kmalloc(sizeof(struct tcp_connection), GFP_KERNEL);
-    if (!conn) {
-        printk(KERN_ERR
-               "Failed to allocate memory for new TCP connection, skipping\n");
-        return;
-    }
-
-    conn->conn.state = TCP_CLOSE;
-    conn->conn.saddr = daddr;
-    conn->conn.daddr = saddr;
-    tcp_fsm_step(&conn->conn, INCOMING, tcp_header);
-    hash_add(tcp_connections, &conn->node, hash);
 }
 
 int init_tcp_conntrack(struct class *fw_sysfs_class) {
-    hash_init(
-        tcp_connections); // TODO: Maybe we also need a destroy function (?)
+    hash_init(tcp_connections);
 
     conns_dev_major = register_chrdev(0, DEVICE_NAME_CONNTRACK, &fops);
     if (conns_dev_major < 0) {
@@ -208,7 +221,7 @@ int init_tcp_conntrack(struct class *fw_sysfs_class) {
             conns_dev, (const struct device_attribute *)&dev_attr_conns.attr)) {
         goto device_destroy;
     }
-    return 0; // TODO: Implement
+    return 0;
 
 device_destroy:
     device_destroy(fw_sysfs_class, MKDEV(conns_dev_major, 0));
@@ -218,8 +231,13 @@ unregister_chrdev:
 }
 
 void destroy_tcp_conntrack(struct class *fw_sysfs_class) {
+    unsigned i;
+    struct tcp_connection_node *cur;
+
     device_remove_file(conns_dev,
                        (const struct device_attribute *)&dev_attr_conns.attr);
     device_destroy(fw_sysfs_class, MKDEV(conns_dev_major, 0));
     unregister_chrdev(conns_dev_major, DEVICE_NAME_RULES);
+
+    hash_for_each(tcp_connections, i, cur, node) { close_connection(cur); }
 }
