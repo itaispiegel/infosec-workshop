@@ -6,6 +6,7 @@
 #include "logs.h"
 #include "netfilter_hook.h"
 #include "parser.h"
+#include "proxy.h"
 #include "tcp_conntrack.h"
 
 extern struct list_head logs_list;
@@ -14,13 +15,19 @@ extern size_t logs_count;
 extern rule_t rules[MAX_RULES];
 extern __u8 rules_count;
 
-static unsigned int forward_hook_func(void *priv, struct sk_buff *skb,
-                                      const struct nf_hook_state *state);
+static unsigned int netfilter_hook_func(void *priv, struct sk_buff *skb,
+                                        const struct nf_hook_state *state);
 
-static const struct nf_hook_ops forward_hook = {
-    .hook = forward_hook_func,
+static const struct nf_hook_ops nf_prerouting_op = {
+    .hook = netfilter_hook_func,
     .pf = NFPROTO_IPV4,
-    .hooknum = NF_INET_FORWARD,
+    .hooknum = NF_INET_PRE_ROUTING,
+};
+
+static const struct nf_hook_ops nf_local_out_op = {
+    .hook = netfilter_hook_func,
+    .pf = NFPROTO_IPV4,
+    .hooknum = NF_INET_LOCAL_OUT,
 };
 
 static inline bool match_direction(rule_t *rule, packet_t *packet) {
@@ -132,16 +139,18 @@ static void update_log_entry_by_packet(packet_t *packet, reason_t reason,
     logs_count++;
 }
 
-static unsigned int forward_hook_func(void *priv, struct sk_buff *skb,
-                                      const struct nf_hook_state *state) {
+static unsigned int netfilter_hook_func(void *priv, struct sk_buff *skb,
+                                        const struct nf_hook_state *state) {
     __u8 i, verdict;
     packet_t packet;
     bool matched;
+    struct tcphdr *tcp_header;
 
     parse_packet(&packet, skb);
 
     if (packet.type == PACKET_TYPE_LOOPBACK ||
-        packet.type == PACKET_TYPE_UNHANDLED_PROTOCOL) {
+        packet.type == PACKET_TYPE_UNHANDLED_PROTOCOL ||
+        packet.type == PACKET_TYPE_LOCAL) {
         // In this case we want to accept the packet without logging it.
         return NF_ACCEPT;
     } else if (packet.type == PACKET_TYPE_XMAS) {
@@ -150,9 +159,17 @@ static unsigned int forward_hook_func(void *priv, struct sk_buff *skb,
     }
 
     // In these cases, the packet must be a normal packet.
-    if (packet.protocol == PROT_TCP && packet.ack) {
-        matched = match_connection_and_update_state(packet, tcp_hdr(skb));
-        return NF_ACCEPT ? matched : NF_DROP;
+    if (packet.protocol == PROT_TCP) {
+        // TODO: Need to update log
+        tcp_header = tcp_hdr(skb);
+        if (packet.ack) {
+            matched = match_connection_and_update_state(packet, tcp_header);
+            if (!matched) {
+                return NF_DROP;
+            }
+            proxy_packet(&packet, skb);
+            return NF_ACCEPT;
+        }
     }
 
     for (i = 0; i < rules_count; i++) {
@@ -160,7 +177,8 @@ static unsigned int forward_hook_func(void *priv, struct sk_buff *skb,
             verdict = rules[i].action;
             update_log_entry_by_packet(&packet, i, verdict);
             if (verdict == NF_ACCEPT && packet.protocol == PROT_TCP) {
-                track_connection(&packet, tcp_hdr(skb));
+                track_connection(&packet, tcp_header);
+                proxy_packet(&packet, skb);
             }
             return verdict;
         }
@@ -171,9 +189,18 @@ static unsigned int forward_hook_func(void *priv, struct sk_buff *skb,
 }
 
 int init_netfilter_hook(void) {
-    return nf_register_net_hook(&init_net, &forward_hook);
+    int res;
+    if ((res = nf_register_net_hook(&init_net, &nf_prerouting_op)) != 0) {
+        return res;
+    }
+    if ((res = nf_register_net_hook(&init_net, &nf_local_out_op)) != 0) {
+        nf_unregister_net_hook(&init_net, &nf_prerouting_op);
+        return res;
+    }
+    return res;
 }
 
 void destroy_netfilter_hook(void) {
-    nf_unregister_net_hook(&init_net, &forward_hook);
+    nf_unregister_net_hook(&init_net, &nf_local_out_op);
+    nf_unregister_net_hook(&init_net, &nf_prerouting_op);
 }

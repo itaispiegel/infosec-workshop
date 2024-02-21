@@ -183,9 +183,11 @@ void track_connection(packet_t *packet, struct tcphdr *tcp_header) {
         .daddr = daddr,
     };
     tcp_fsm_step(&conn->conn, OUTGOING, tcp_header);
-    hash_add(tcp_connections, &conn->node, hash);
-    printk(KERN_DEBUG "Tracking new TCP connection %u:%u --> %u:%u\n",
-           saddr.addr, saddr.port, daddr.addr, daddr.port);
+    hash_add(tcp_connections, &conn->node,
+             hash); // TODO: Can this add the same item twice?
+    printk(KERN_DEBUG "Tracking new TCP connection %pI4:%u --> %pI4:%u\n",
+           &saddr.addr, be16_to_cpu(saddr.port), &daddr.addr,
+           be16_to_cpu(daddr.port));
 
     inverse_conn = kmalloc(sizeof(struct tcp_connection_node), GFP_KERNEL);
     if (!inverse_conn) {
@@ -200,8 +202,8 @@ void track_connection(packet_t *packet, struct tcphdr *tcp_header) {
     };
     tcp_fsm_step(&inverse_conn->conn, INCOMING, tcp_header);
     hash_add(tcp_connections, &inverse_conn->node, inverse_hash);
-    printk(KERN_DEBUG "Tracking new TCP connection %u:%u --> %u:%u\n",
-           daddr.addr, daddr.port, saddr.addr, saddr.port);
+    printk(KERN_DEBUG "Tracking new TCP connection %pI4:%u --> %pI4:%u\n",
+           &daddr.addr, daddr.port, &saddr.addr, saddr.port);
 }
 
 bool match_connection_and_update_state(packet_t packet,
@@ -219,10 +221,9 @@ bool match_connection_and_update_state(packet_t packet,
         if (match_conn_addrs(&conn->conn, &saddr, &daddr)) {
             tcp_fsm_step(&conn->conn, OUTGOING, tcp_header);
             if (conn->conn.state == TCP_CLOSE) {
-                printk(
-                    KERN_DEBUG
-                    "Removing closed connection from table %u:%u --> %u:%u\n",
-                    saddr.addr, saddr.port, daddr.addr, daddr.port);
+                printk(KERN_DEBUG "Removing closed connection from table "
+                                  "%pI4:%u --> %pI4:%u\n",
+                       saddr.addr, saddr.port, daddr.addr, daddr.port);
                 close_connection(conn);
             }
             matched = true;
@@ -233,10 +234,9 @@ bool match_connection_and_update_state(packet_t packet,
         if (match_conn_addrs(&conn->conn, &daddr, &saddr)) {
             tcp_fsm_step(&conn->conn, INCOMING, tcp_header);
             if (conn->conn.state == TCP_CLOSE) {
-                printk(
-                    KERN_DEBUG
-                    "Removing closed connection from table %u:%u --> %u:%u\n",
-                    daddr.addr, daddr.port, saddr.addr, saddr.port);
+                printk(KERN_DEBUG "Removing closed connection from table "
+                                  "%pI4:%u --> %pI4:%u\n",
+                       daddr.addr, daddr.port, saddr.addr, saddr.port);
                 close_connection(conn);
             }
             matched = true;
