@@ -44,13 +44,11 @@ typedef enum {
 #define PORT_ANY (0)
 #define PORT_ABOVE_1023 (1023)
 #define PORT_ABOVE_1023_BE (be16_to_cpu(PORT_ABOVE_1023))
+#define HTTP_PORT_BE (be16_to_cpu(80))
+#define HTTP_PROXY_PORT_BE (be16_to_cpu(800))
+#define FTP_PORT_BE (be16_to_cpu(21))
+#define FTP_PROXY_PORT_BE (be16_to_cpu(210))
 #define MAX_RULES (50)
-
-// device minor numbers, for your convenience
-typedef enum {
-    MINOR_RULES = 0,
-    MINOR_LOG = 1,
-} __attribute__((packed)) minor_t;
 
 typedef enum {
     ACK_NO = 0x01,
@@ -64,7 +62,6 @@ typedef enum {
     DIRECTION_ANY = DIRECTION_IN | DIRECTION_OUT,
 } __attribute__((packed)) direction_t;
 
-// rule base
 typedef struct {
     char rule_name[20]; // names will be no longer than 20 chars
     direction_t direction;
@@ -85,7 +82,6 @@ typedef struct {
     __u8 action;     // valid values: NF_ACCEPT, NF_DROP
 } __attribute__((packed)) rule_t;
 
-// logging
 typedef struct {
     unsigned long timestamp; // time of creation/update
     unsigned char protocol;  // values from: prot_t
