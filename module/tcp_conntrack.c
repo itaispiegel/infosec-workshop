@@ -27,7 +27,7 @@ static ssize_t conns_table_show(struct device *dev,
     return offset;
 }
 
-static DEVICE_ATTR(conns, S_IRUSR | S_IWUSR, conns_table_show, NULL);
+static DEVICE_ATTR(conns, S_IRUSR, conns_table_show, NULL);
 
 static inline bool match_conn_addrs(struct tcp_connection *conn,
                                     struct socket_address *saddr,
