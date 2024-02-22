@@ -31,13 +31,8 @@ static const struct nf_hook_ops nf_local_out_op = {
 };
 
 static inline bool match_direction(rule_t *rule, packet_t *packet) {
-    // This is a bit confusing, but the packets going outside are received
-    // on the IN device and vice versa, so the direction is reversed.
     return rule->direction == DIRECTION_ANY ||
-           (rule->direction == DIRECTION_IN &&
-            strcmp(packet->dev_name, OUT_NET_DEVICE_NAME) == 0) ||
-           (rule->direction == DIRECTION_OUT &&
-            strcmp(packet->dev_name, IN_NET_DEVICE_NAME) == 0);
+           rule->direction == packet->direction;
 }
 
 static inline bool match_rule_ports(__be16 rule_port, __be16 skb_port) {
@@ -146,11 +141,11 @@ static unsigned int netfilter_hook_func(void *priv, struct sk_buff *skb,
     bool matched;
     struct tcphdr *tcp_header;
 
-    parse_packet(&packet, skb);
+    parse_packet(&packet, skb, state);
 
+    // TODO: Handle local packets
     if (packet.type == PACKET_TYPE_LOOPBACK ||
-        packet.type == PACKET_TYPE_UNHANDLED_PROTOCOL ||
-        packet.type == PACKET_TYPE_LOCAL) {
+        packet.type == PACKET_TYPE_UNHANDLED_PROTOCOL) {
         // In this case we want to accept the packet without logging it.
         return NF_ACCEPT;
     } else if (packet.type == PACKET_TYPE_XMAS) {

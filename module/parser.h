@@ -13,7 +13,7 @@ typedef enum {
 
 typedef struct {
     packet_type type;
-    char *dev_name;
+    direction_t direction;
     __be32 src_ip;
     __be32 dst_ip;
     __be16 src_port;
@@ -22,6 +22,7 @@ typedef struct {
     unsigned short ack;
 } packet_t;
 
-void parse_packet(packet_t *packet, struct sk_buff *skb);
+void parse_packet(packet_t *packet, const struct sk_buff *skb,
+                  const struct nf_hook_state *state);
 
 #endif // _PARSER_H_
