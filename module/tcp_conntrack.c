@@ -72,12 +72,17 @@ static void tcp_fsm_step(struct tcp_connection *conn,
             }
             break;
         case TCP_FIN_WAIT1:
-            if (tcp_header->fin) {
-                conn->state = TCP_CLOSING;
+            if (tcp_header->fin && tcp_header->ack) {
+                conn->state = TCP_CLOSE; // Originally this goes to TIME_WAIT,
+                                         // but we don't handle this state
                 return;
             }
             if (tcp_header->ack) {
                 conn->state = TCP_FIN_WAIT2;
+                return;
+            }
+            if (tcp_header->fin) {
+                conn->state = TCP_CLOSING;
                 return;
             }
             break;
@@ -156,10 +161,32 @@ static inline void close_connection(struct tcp_connection_node *conn) {
     kfree(conn);
 }
 
-__u32 hash_conn_addrs(struct socket_address *saddr,
-                      struct socket_address *daddr) {
+static inline __u32 hash_conn_addrs(struct socket_address *saddr,
+                                    struct socket_address *daddr) {
     return jhash2((u32[4]){saddr->addr, saddr->port, daddr->addr, daddr->port},
                   4, 0);
+}
+
+static inline bool update_connection_state(struct tcphdr *tcp_header,
+                                           struct socket_address saddr,
+                                           struct socket_address daddr,
+                                           direction_t direction) {
+    struct tcp_connection_node *conn;
+    __u32 hash = hash_conn_addrs(&saddr, &daddr);
+
+    hash_for_each_possible(tcp_connections, conn, node, hash) {
+        if (match_conn_addrs(&conn->conn, &saddr, &daddr)) {
+            tcp_fsm_step(&conn->conn, direction, tcp_header);
+            if (conn->conn.state == TCP_CLOSE) {
+                printk(KERN_DEBUG "Removing closed connection from table "
+                                  "%pI4:%u --> %pI4:%u\n",
+                       &saddr.addr, saddr.port, &daddr.addr, daddr.port);
+                close_connection(conn);
+            }
+            return true;
+        }
+    }
+    return false;
 }
 
 void track_connection(packet_t *packet, struct tcphdr *tcp_header) {
@@ -212,37 +239,10 @@ bool match_connection_and_update_state(packet_t packet,
                                    .port = packet.src_port};
     struct socket_address daddr = {.addr = packet.dst_ip,
                                    .port = packet.dst_port};
-    struct tcp_connection_node *conn;
     bool matched = false;
-    __u32 hash = hash_conn_addrs(&saddr, &daddr);
-    __u32 inverse_hash = hash_conn_addrs(&daddr, &saddr);
 
-    hash_for_each_possible(tcp_connections, conn, node, hash) {
-        if (match_conn_addrs(&conn->conn, &saddr, &daddr)) {
-            tcp_fsm_step(&conn->conn, OUTGOING, tcp_header);
-            if (conn->conn.state == TCP_CLOSE) {
-                printk(KERN_DEBUG "Removing closed connection from table "
-                                  "%pI4:%u --> %pI4:%u\n",
-                       saddr.addr, saddr.port, daddr.addr, daddr.port);
-                close_connection(conn);
-            }
-            matched = true;
-        }
-    }
-
-    hash_for_each_possible(tcp_connections, conn, node, inverse_hash) {
-        if (match_conn_addrs(&conn->conn, &daddr, &saddr)) {
-            tcp_fsm_step(&conn->conn, INCOMING, tcp_header);
-            if (conn->conn.state == TCP_CLOSE) {
-                printk(KERN_DEBUG "Removing closed connection from table "
-                                  "%pI4:%u --> %pI4:%u\n",
-                       daddr.addr, daddr.port, saddr.addr, saddr.port);
-                close_connection(conn);
-            }
-            matched = true;
-        }
-    }
-
+    matched = update_connection_state(tcp_header, saddr, daddr, OUTGOING);
+    matched |= update_connection_state(tcp_header, daddr, saddr, INCOMING);
     return matched;
 }
 

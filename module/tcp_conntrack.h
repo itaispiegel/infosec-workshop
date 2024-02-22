@@ -28,8 +28,6 @@ struct tcp_connection_node {
     struct hlist_node node;
 };
 
-__u32 hash_conn_addrs(struct socket_address *saddr,
-                      struct socket_address *daddr);
 void track_connection(packet_t *packet, struct tcphdr *tcp_header);
 bool match_connection_and_update_state(packet_t packet,
                                        struct tcphdr *tcp_header);
