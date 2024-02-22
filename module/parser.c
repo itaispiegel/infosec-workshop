@@ -9,21 +9,39 @@ static inline bool is_loopback_addr(__be32 addr) {
     return (addr & LOOPBACK_MASK) == LOOPBACK_PREFIX;
 }
 
-void parse_packet(packet_t *packet, struct sk_buff *skb) {
+static inline direction_t parse_direction(const struct nf_hook_state *state) {
+    char *in_dev_name = state->in->name;
+    char *out_dev_name = state->out->name;
+
+    if ((in_dev_name != NULL &&
+         strcmp(in_dev_name, OUT_NET_DEVICE_NAME) == 0) ||
+        (out_dev_name != NULL &&
+         strcmp(out_dev_name, IN_NET_DEVICE_NAME) == 0)) {
+        return DIRECTION_IN;
+    } else if ((in_dev_name != NULL &&
+                strcmp(in_dev_name, IN_NET_DEVICE_NAME) == 0) ||
+               (out_dev_name != NULL &&
+                strcmp(out_dev_name, OUT_NET_DEVICE_NAME) == 0)) {
+        return DIRECTION_OUT;
+    } else {
+        return DIRECTION_ANY;
+    }
+}
+
+void parse_packet(packet_t *packet, const struct sk_buff *skb,
+                  const struct nf_hook_state *state) {
     struct iphdr *ip_header;
     struct tcphdr *tcp_header;
     struct udphdr *udp_header;
-
-    struct in_ifaddr *ifa;
-    struct in_device *in_dev;
 
     ip_header = ip_hdr(skb);
 
     packet->src_ip = ip_header->saddr;
     packet->dst_ip = ip_header->daddr;
-    packet->dev_name = skb->dev->name;
     packet->protocol = ip_header->protocol;
+    packet->direction = parse_direction(state);
 
+    // TODO: Support local packets.
     // Notice that we the store the exact ports, even if they're above 1023.
     if (packet->protocol == PROT_TCP) {
         tcp_header = tcp_hdr(skb);
@@ -54,13 +72,5 @@ void parse_packet(packet_t *packet, struct sk_buff *skb) {
     // TODO: Verify this implementation
     if (is_loopback_addr(packet->src_ip) || is_loopback_addr(packet->dst_ip)) {
         packet->type = PACKET_TYPE_LOOPBACK;
-    }
-
-    in_dev = __in_dev_get_rtnl(skb->dev);
-    for (ifa = in_dev->ifa_list; ifa; ifa = ifa->ifa_next) {
-        if (ifa->ifa_local == ip_header->saddr ||
-            ifa->ifa_local == ip_header->daddr) {
-            packet->type = PACKET_TYPE_LOCAL;
-        }
     }
 }
