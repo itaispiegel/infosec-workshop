@@ -29,21 +29,21 @@ static int __init init(void) {
         goto destroy_show_logs_device;
     }
 
-    if (init_netfilter_hook() < 0) {
-        printk(KERN_ERR "Failed to initialize netfilter hook\n");
+    if (init_tcp_conntrack(fw_sysfs_class) < 0) {
+        printk(KERN_ERR "Failed to initialize TCP conntrack\n");
         goto destroy_reset_logs_device;
     }
 
-    if (init_tcp_conntrack(fw_sysfs_class) < 0) {
-        printk(KERN_ERR "Failed to initialize TCP conntrack\n");
-        goto destroy_netfilter_hook;
+    if (init_netfilter_hook() < 0) {
+        printk(KERN_ERR "Failed to initialize netfilter hook\n");
+        goto destroy_tcp_conntrack;
     }
 
     printk(KERN_INFO "Firewall loaded\n");
     return 0;
 
-destroy_netfilter_hook:
-    destroy_netfilter_hook();
+destroy_tcp_conntrack:
+    destroy_tcp_conntrack(fw_sysfs_class);
 destroy_reset_logs_device:
     destroy_reset_logs_device(fw_sysfs_class);
 destroy_show_logs_device:
