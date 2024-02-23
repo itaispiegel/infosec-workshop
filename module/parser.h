@@ -32,6 +32,13 @@ typedef struct {
     };
 } packet_t;
 
+/**
+ * Parse the packet and fill the packet_t struct.
+ * @param packet The packet_t struct to fill.
+ * @param skb The socket buffer that contains the packet.
+ * @param state The netfilter hook state. Used to determine the packet
+ * direction.
+ */
 void parse_packet(packet_t *packet, const struct sk_buff *skb,
                   const struct nf_hook_state *state);
 

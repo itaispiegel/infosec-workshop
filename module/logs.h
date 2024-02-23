@@ -43,9 +43,30 @@ struct log_entry {
     struct list_head list;
 };
 
+/**
+ * Initialize the device that shows the logs.
+ * @param fw_sysfs_class The class to which the device will belong.
+ * @return 0 on success, a negative value on failure.
+ */
 int init_show_logs_device(struct class *fw_sysfs_class);
+
+/**
+ * Initialize the device that resets the logs.
+ * @param fw_sysfs_class The class to which the device will belong.
+ * @return 0 on success, a negative value on failure.
+ */
 int init_reset_logs_device(struct class *fw_sysfs_class);
+
+/**
+ * Destroy the device that shows the logs.
+ * @param fw_sysfs_class The class to which the device belongs.
+ */
 void destroy_show_logs_device(struct class *fw_sysfs_class);
+
+/**
+ * Destroy the device that resets the logs.
+ * @param fw_sysfs_class The class to which the device belongs.
+ */
 void destroy_reset_logs_device(struct class *fw_sysfs_class);
 
 #endif // _LOGS_H_
