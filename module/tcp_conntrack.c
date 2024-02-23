@@ -5,8 +5,6 @@
 #include <linux/jhash.h>
 #include <net/netfilter/nf_conntrack_tuple.h>
 
-#include "direction.h"
-
 static DECLARE_HASHTABLE(tcp_connections, 8);
 
 static int conns_dev_major;

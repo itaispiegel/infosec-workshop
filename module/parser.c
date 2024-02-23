@@ -1,6 +1,7 @@
 #include <linux/inetdevice.h>
 
 #include "parser.h"
+#include "types.h"
 
 #define IN_NET_DEVICE_NAME "enp0s8"
 #define OUT_NET_DEVICE_NAME "enp0s9"
