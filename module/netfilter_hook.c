@@ -186,7 +186,9 @@ static unsigned int netfilter_hook_func(void *priv, struct sk_buff *skb,
 
         if (packet.ack) {
             matched = match_connection_and_update_state(packet);
-            return NF_ACCEPT ? matched : NF_DROP;
+            verdict = matched ? NF_ACCEPT : NF_DROP;
+            // update_log_entry_by_packet(&packet, i, verdict);
+            return verdict;
         }
     }
 
@@ -195,7 +197,7 @@ static unsigned int netfilter_hook_func(void *priv, struct sk_buff *skb,
             verdict = rules[i].action;
             update_log_entry_by_packet(&packet, i, verdict);
             if (verdict == NF_ACCEPT && packet.protocol == PROT_TCP) {
-                track_connection(&packet);
+                track_two_sided_connection(&packet);
             }
             return verdict;
         }
