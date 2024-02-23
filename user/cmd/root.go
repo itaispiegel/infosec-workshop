@@ -3,7 +3,6 @@ package cmd
 import (
 	"os"
 
-	"github.com/itaispiegel/infosec-workshop/user/pkg/module"
 	"github.com/spf13/cobra"
 )
 
@@ -20,10 +19,10 @@ var RootCmd = &cobra.Command{
 }
 
 func Execute() {
-	if !module.IsLoaded() {
-		RootCmd.Println("Error: The firewall kernel module is not loaded.")
-		os.Exit(1)
-	}
+	// if !module.IsLoaded() {
+	// 	RootCmd.Println("Error: The firewall kernel module is not loaded.")
+	// 	os.Exit(1)
+	// }
 
 	if err := RootCmd.Execute(); err != nil {
 		os.Exit(1)

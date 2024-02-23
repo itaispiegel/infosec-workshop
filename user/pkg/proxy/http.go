@@ -41,18 +41,21 @@ func (p *HttpProxy) Start() error {
 }
 
 func (p *HttpProxy) handleConnection(conn net.Conn) {
-	defer conn.Close()
 	log.Debug().Msgf("Accepted connection from %s", conn.RemoteAddr())
 	srcAddrParts := strings.Split(conn.RemoteAddr().String(), ":")
 	srcIp := net.ParseIP(srcAddrParts[0])
 	srcPort, _ := strconv.Atoi(srcAddrParts[1])
-	destAddr, err := lookupDestinationAddr([4]byte(srcIp), uint16(srcPort))
+	destAddr, err := lookupDestinationAddr([4]byte(srcIp.To4()), uint16(srcPort))
 	if err != nil {
 		log.Error().Err(err).Msg("Error looking up destination address")
 		return
 	}
 
-	log.Info().Msgf("Accepted connection from %s", conn.RemoteAddr())
 	log.Info().Msgf("Forwarding to %s", destAddr)
-	conn.Write([]byte("HTTP/1.1 200 OK\r\n\r\nHello, World!\n"))
+	conn.Write([]byte("HTTP/1.1 200 OK\r\n" +
+		"Content-Length: 14\r\n" +
+		"Content-Type: text/plain\r\n" +
+		"\r\n" +
+		"Hello, World!\n"))
+	conn.Close()
 }

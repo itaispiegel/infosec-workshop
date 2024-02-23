@@ -5,6 +5,7 @@
 
 #include "parser.h"
 
-void proxy_packet(packet_t *packet, struct sk_buff *skb);
+void proxy_client_request(packet_t *packet, struct sk_buff *skb);
+void proxy_server_response(packet_t *packet, struct sk_buff *skb);
 
 #endif // _PROXY_H
