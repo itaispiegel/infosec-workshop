@@ -60,6 +60,10 @@ func (p *HttpProxy) handleConnection(conn net.Conn) {
 		return
 	}
 
+	// proxyPort := uint16(serverConn.LocalAddr().(*net.TCPAddr).Port)
+	// log.Debug().Uint16("proxyPort", proxyPort).Msgf("Setting proxy port")
+	// setProxyPort([4]byte(srcIp.To4()), uint16(srcPort), [4]byte(destAddr.AddrPort().Addr().As4()), uint16(destAddr.Port), proxyPort)
+
 	done := make(chan struct{})
 	go func() {
 		defer conn.Close()

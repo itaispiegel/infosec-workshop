@@ -19,6 +19,19 @@ static struct file_operations fops = {
     .owner = THIS_MODULE,
 };
 
+static inline bool match_conn_addrs(struct tcp_connection *conn,
+                                    struct socket_address *saddr,
+                                    struct socket_address *daddr) {
+    return conn->saddr.addr == saddr->addr && conn->saddr.port == saddr->port &&
+           conn->daddr.addr == daddr->addr && conn->daddr.port == daddr->port;
+}
+
+static inline __u32 hash_conn_addrs(struct socket_address saddr,
+                                    struct socket_address daddr) {
+    return jhash2((u32[4]){saddr.addr, saddr.port, daddr.addr, daddr.port}, 4,
+                  0);
+}
+
 static ssize_t conns_table_show(struct device *dev,
                                 struct device_attribute *attr, char *buf) {
     struct tcp_connection_node *cur;
@@ -34,34 +47,48 @@ static ssize_t conns_table_show(struct device *dev,
 static ssize_t proxy_port_store(struct device *dev,
                                 struct device_attribute *attr, const char *buf,
                                 size_t count) {
-    return 0;
+    struct tcp_connection_node *conn_node;
+    struct socket_address saddr;
+    struct socket_address daddr;
+    __be16 proxy_port;
+
+    size_t expected_count = sizeof(struct socket_address) +
+                            sizeof(struct socket_address) + sizeof(__be16);
+
+    if (count != expected_count) {
+        return -EINVAL;
+    }
+
+    memcpy(&saddr, buf, sizeof(struct socket_address));
+    memcpy(&daddr, buf + sizeof(struct socket_address),
+           sizeof(struct socket_address));
+    memcpy(&proxy_port,
+           buf + sizeof(struct socket_address) + sizeof(struct socket_address),
+           sizeof(__be16));
+
+    if ((conn_node = lookup_tcp_connection_node(saddr, daddr)) == NULL) {
+        return -ENOENT;
+    }
+
+    conn_node->conn.proxy_port = proxy_port;
+    printk(KERN_DEBUG
+           "Proxy port set to %u for connection %pI4:%u --> %pI4:%u\n",
+           be16_to_cpu(proxy_port), &saddr.addr, be16_to_cpu(saddr.port),
+           &daddr.addr, be16_to_cpu(daddr.port));
+    return expected_count;
 }
 
 static DEVICE_ATTR(conns, S_IRUSR, conns_table_show, NULL);
 static DEVICE_ATTR(proxy_port, S_IWUSR, NULL, proxy_port_store);
-
-static inline bool match_conn_addrs(struct tcp_connection *conn,
-                                    struct socket_address *saddr,
-                                    struct socket_address *daddr) {
-    return conn->saddr.addr == saddr->addr && conn->saddr.port == saddr->port &&
-           conn->daddr.addr == daddr->addr && conn->daddr.port == daddr->port;
-}
-
-static inline __u32 hash_conn_addrs(struct socket_address saddr,
-                                    struct socket_address daddr) {
-    return jhash2((u32[4]){saddr.addr, saddr.port, daddr.addr, daddr.port}, 4,
-                  0);
-}
 
 static inline void close_connection(struct tcp_connection_node *conn) {
     hash_del(&conn->node);
     kfree(conn);
 }
 
-static void tcp_fsm_step(struct tcp_connection *conn,
-                         enum connection_direction direction,
+static void tcp_fsm_step(struct tcp_connection *conn, direction_t direction,
                          struct tcphdr *tcp_header) {
-    if (direction == INCOMING) {
+    if (direction == DIRECTION_IN) {
         switch (conn->state) {
         case TCP_CLOSE:
             // Originally this is TCP_LISTEN, but we don't handle this state,
@@ -129,7 +156,7 @@ static void tcp_fsm_step(struct tcp_connection *conn,
             }
             break;
         }
-    } else if (direction == OUTGOING) {
+    } else if (direction == DIRECTION_OUT) {
         switch (conn->state) {
         case TCP_CLOSE:
             if (tcp_header->syn) {
@@ -159,23 +186,12 @@ static void tcp_fsm_step(struct tcp_connection *conn,
     }
 }
 
-static struct tcp_connection_node *
-get_connection_node(struct socket_address saddr, struct socket_address daddr) {
-    struct tcp_connection_node *conn_node;
-    __u32 hash = hash_conn_addrs(saddr, daddr);
-    hash_for_each_possible(tcp_connections, conn_node, node, hash) {
-        if (match_conn_addrs(&conn_node->conn, &saddr, &daddr)) {
-            return conn_node;
-        }
-    }
-    return NULL;
-}
-
 static inline bool update_connection_state(struct tcphdr *tcp_header,
                                            struct socket_address saddr,
                                            struct socket_address daddr,
                                            direction_t direction) {
-    struct tcp_connection_node *conn_node = get_connection_node(saddr, daddr);
+    struct tcp_connection_node *conn_node =
+        lookup_tcp_connection_node(saddr, daddr);
 
     if (conn_node == NULL) {
         return false;
@@ -190,37 +206,63 @@ static inline bool update_connection_state(struct tcphdr *tcp_header,
     return true;
 }
 
-bool init_connection(struct socket_address saddr, struct socket_address daddr,
-                     struct tcphdr *tcp_header, __u32 hash,
-                     enum connection_direction direction) {
-    struct tcp_connection_node *conn =
-        kmalloc(sizeof(struct tcp_connection_node), GFP_KERNEL);
-    if (!conn) {
-        return false;
+struct tcp_connection_node *
+lookup_tcp_connection_node(struct socket_address saddr,
+                           struct socket_address daddr) {
+    struct tcp_connection_node *conn_node;
+    __u32 hash = hash_conn_addrs(saddr, daddr);
+    hash_for_each_possible(tcp_connections, conn_node, node, hash) {
+        if (match_conn_addrs(&conn_node->conn, &saddr, &daddr)) {
+            return conn_node;
+        }
     }
-
-    conn->conn = (struct tcp_connection){
-        .state = TCP_CLOSE,
-        .saddr = saddr,
-        .daddr = daddr,
-    };
-    tcp_fsm_step(&conn->conn, direction, tcp_header);
-    hash_add(tcp_connections, &conn->node, hash);
-    return true;
+    return NULL;
 }
 
-void track_connection(packet_t *packet) {
-    struct tcp_connection_node *conn, *inverse_conn;
-    struct socket_address saddr = {.addr = packet->src_ip,
-                                   .port = packet->src_port};
-    struct socket_address daddr = {.addr = packet->dst_ip,
-                                   .port = packet->dst_port};
-    __u32 hash = hash_conn_addrs(saddr, daddr);
-    __u32 inverse_hash = hash_conn_addrs(daddr, saddr);
+struct socket_address lookup_client_address_by_proxy_port(__be16 proxy_port) {
+    unsigned i;
+    struct tcp_connection_node *conn_node;
+    struct socket_address client_addr = {.addr = 0, .port = 0};
+    hash_for_each(tcp_connections, i, conn_node, node) {
+        if (conn_node->conn.proxy_port == proxy_port) {
+            return conn_node->conn.saddr;
+        }
+    }
+    return client_addr;
+}
 
-    struct tcp_connection_node *existing_conn_node =
-        get_connection_node(saddr, daddr);
-    if (existing_conn_node == NULL) {
+struct socket_address
+lookup_server_address_by_client_address(struct socket_address client_addr) {
+    unsigned i;
+    struct tcp_connection_node *conn_node;
+    struct socket_address server_addr = {.addr = 0, .port = 0};
+    hash_for_each(tcp_connections, i, conn_node, node) {
+        if (conn_node->conn.saddr.addr == client_addr.addr &&
+            conn_node->conn.saddr.port == client_addr.port) {
+            return conn_node->conn.daddr;
+        }
+    }
+    return server_addr;
+}
+
+void track_one_sided_connection(packet_t *packet, direction_t direction) {
+    struct tcp_connection_node *conn;
+    struct socket_address saddr, daddr;
+    __u32 hash;
+
+    if (direction == DIRECTION_OUT) {
+        saddr.addr = packet->src_ip;
+        saddr.port = packet->src_port;
+        daddr.addr = packet->dst_ip;
+        daddr.port = packet->dst_port;
+    } else {
+        saddr.addr = packet->dst_ip;
+        saddr.port = packet->dst_port;
+        daddr.addr = packet->src_ip;
+        daddr.port = packet->src_port;
+    }
+
+    if ((conn = lookup_tcp_connection_node(saddr, daddr)) == NULL) {
         conn = kmalloc(sizeof(struct tcp_connection_node), GFP_KERNEL);
         if (!conn) {
             printk(KERN_ERR "Failed to allocate memory for connection\n");
@@ -232,47 +274,32 @@ void track_connection(packet_t *packet) {
             .saddr = saddr,
             .daddr = daddr,
         };
-        tcp_fsm_step(&conn->conn, OUTGOING, packet->tcp_header);
+        hash = hash_conn_addrs(saddr, daddr);
+        tcp_fsm_step(&conn->conn, direction, packet->tcp_header);
         hash_add(tcp_connections, &conn->node, hash);
         printk(KERN_DEBUG
                "Tracking new TCP connection %pI4:%u --> %pI4:%u, hash=%u\n",
                &saddr.addr, be16_to_cpu(saddr.port), &daddr.addr,
                be16_to_cpu(daddr.port), hash);
     }
+}
 
-    existing_conn_node = get_connection_node(daddr, saddr);
-    if (existing_conn_node == NULL) {
-        inverse_conn = kmalloc(sizeof(struct tcp_connection_node), GFP_KERNEL);
-        if (!inverse_conn) {
-            printk(KERN_ERR "Failed to allocate memory for connection\n");
-            return;
-        }
-
-        inverse_conn->conn = (struct tcp_connection){
-            .state = TCP_CLOSE,
-            .saddr = daddr,
-            .daddr = saddr,
-        };
-        tcp_fsm_step(&inverse_conn->conn, INCOMING, packet->tcp_header);
-        hash_add(tcp_connections, &inverse_conn->node, inverse_hash);
-        printk(KERN_DEBUG
-               "Tracking new TCP connection %pI4:%u --> %pI4:%u, hash=%u\n",
-               &daddr.addr, be16_to_cpu(daddr.port), &saddr.addr,
-               be16_to_cpu(saddr.port), inverse_hash);
-    }
+void track_two_sided_connection(packet_t *packet) {
+    track_one_sided_connection(packet, DIRECTION_OUT);
+    track_one_sided_connection(packet, DIRECTION_IN);
 }
 
 bool match_connection_and_update_state(packet_t packet) {
-    bool matched = false;
     struct socket_address saddr = {.addr = packet.src_ip,
                                    .port = packet.src_port};
     struct socket_address daddr = {.addr = packet.dst_ip,
                                    .port = packet.dst_port};
+    bool matched = false;
 
     matched =
-        update_connection_state(packet.tcp_header, saddr, daddr, OUTGOING);
+        update_connection_state(packet.tcp_header, saddr, daddr, DIRECTION_OUT);
     matched |=
-        update_connection_state(packet.tcp_header, daddr, saddr, INCOMING);
+        update_connection_state(packet.tcp_header, daddr, saddr, DIRECTION_IN);
     return matched;
 }
 
