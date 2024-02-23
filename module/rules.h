@@ -35,7 +35,16 @@ typedef struct {
 extern rule_t rules[MAX_RULES];
 extern __u8 rules_count;
 
+/**
+ * Initialize the rules table device.
+ * @param fw_sysfs_class The class to which the device will belong.
+ */
 int init_rules_table_device(struct class *fw_sysfs_class);
+
+/**
+ * Destroy the rules table device.
+ * @param fw_sysfs_class The class to which the device belongs.
+ */
 void destroy_rules_table_device(struct class *fw_sysfs_class);
 
 #endif // _RULES_H
