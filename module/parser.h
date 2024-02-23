@@ -1,7 +1,20 @@
 #ifndef _PARSER_H_
 #define _PARSER_H_
 
-#include "fw.h"
+#include <linux/ip.h>
+#include <linux/netfilter_ipv4.h>
+#include <linux/tcp.h>
+#include <linux/udp.h>
+
+#include "direction.h"
+
+typedef enum {
+    PROT_ICMP = 1,
+    PROT_TCP = 6,
+    PROT_UDP = 17,
+    PROT_OTHER = 255,
+    PROT_ANY = 143,
+} __attribute__((packed)) prot_t;
 
 typedef enum {
     PACKET_TYPE_LOCAL,

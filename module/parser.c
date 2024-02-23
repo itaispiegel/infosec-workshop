@@ -2,6 +2,9 @@
 
 #include "parser.h"
 
+#define IN_NET_DEVICE_NAME "enp0s8"
+#define OUT_NET_DEVICE_NAME "enp0s9"
+
 static const __be32 LOOPBACK_PREFIX = 0x7f000000;
 static const __be32 LOOPBACK_MASK = 0xff000000;
 

@@ -1,4 +1,7 @@
-#include "rules_table.h"
+#include <linux/device.h>
+#include <linux/fs.h>
+
+#include "rules.h"
 
 rule_t rules[MAX_RULES] = {0};
 __u8 rules_count = 0;

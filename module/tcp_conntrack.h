@@ -6,6 +6,9 @@
 
 #include "parser.h"
 
+#define DEVICE_NAME_CONNTRACK "conn"
+#define DEVICE_NAME_PROXY_PORT "proxy_port"
+
 enum connection_direction {
     NONE = 0,
     INCOMING = 1,
