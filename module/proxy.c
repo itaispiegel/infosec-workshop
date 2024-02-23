@@ -25,21 +25,19 @@ static void fix_checksum(struct sk_buff *skb, struct iphdr *ip_header,
     // }
 }
 
-void proxy_client_request(packet_t *packet, struct sk_buff *skb) {
-    if (packet->direction == DIRECTION_OUT &&
-        packet->dst_port == HTTP_PORT_BE) {
+void reroute_client_to_server_packet(packet_t *packet, struct sk_buff *skb) {
+    if (packet->dst_port == HTTP_PORT_BE) {
         packet->tcp_header->dest = HTTP_PROXY_PORT_BE;
         packet->ip_header->daddr = FW_INTERNAL_PROXY_IP;
         fix_checksum(skb, packet->ip_header, packet->tcp_header);
     }
 }
 
-void proxy_server_response(packet_t *packet, struct sk_buff *skb) {
+void reroute_proxy_to_client_packet(packet_t *packet, struct sk_buff *skb) {
     struct socket_address server_addr;
     struct socket_address client_addr = {.addr = packet->dst_ip,
                                          .port = packet->dst_port};
-    if (packet->direction == DIRECTION_IN &&
-        packet->src_port == HTTP_PROXY_PORT_BE) {
+    if (packet->src_port == HTTP_PROXY_PORT_BE) {
         server_addr = lookup_server_address_by_client_address(client_addr);
         packet->src_port = server_addr.port;
         packet->tcp_header->source = server_addr.port;
@@ -47,4 +45,14 @@ void proxy_server_response(packet_t *packet, struct sk_buff *skb) {
         packet->ip_header->saddr = server_addr.addr;
         fix_checksum(skb, packet->ip_header, packet->tcp_header);
     }
+}
+
+bool is_server_to_proxy_response(packet_t *packet, struct sk_buff *skb) {
+    // TODO: Match by proxy port.
+    return packet->dst_ip == FW_EXTERNAL_PROXY_IP;
+}
+
+bool is_proxy_to_server_request(packet_t *packet, struct sk_buff *skb) {
+    // TODO: Match by proxy port.
+    return packet->src_ip == FW_EXTERNAL_PROXY_IP;
 }

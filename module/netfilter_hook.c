@@ -168,20 +168,33 @@ static unsigned int netfilter_hook_func(void *priv, struct sk_buff *skb,
     if (packet.protocol == PROT_TCP) {
         switch (state->hook) {
         case NF_INET_PRE_ROUTING:
-            proxy_client_request(&packet, skb);
-
-            // Handle packets received from the external network.
-            if (packet.direction == DIRECTION_IN &&
-                packet.dst_ip == FW_EXTERNAL_PROXY_IP) {
-                return NF_ACCEPT;
+            switch (packet.direction) {
+            case DIRECTION_ANY:
+                printk(KERN_WARNING "Dropping packet with unknown direction\n");
+                return NF_DROP;
+            case DIRECTION_OUT:
+                reroute_client_to_server_packet(&packet, skb);
+                break;
+            case DIRECTION_IN:
+                if (is_server_to_proxy_response(&packet, skb)) {
+                    return NF_ACCEPT;
+                }
+                return NF_DROP;
             }
+            break;
         case NF_INET_LOCAL_OUT:
-            proxy_server_response(&packet, skb);
-
-            // Handle packets sent to the external network.
-            if (packet.direction == DIRECTION_OUT &&
-                packet.src_ip == FW_EXTERNAL_PROXY_IP) {
-                return NF_ACCEPT;
+            switch (packet.direction) {
+            case DIRECTION_ANY:
+                printk(KERN_WARNING "Dropping packet with unknown direction\n");
+                return NF_DROP;
+            case DIRECTION_OUT:
+                if (is_proxy_to_server_request(&packet, skb)) {
+                    return NF_ACCEPT;
+                }
+                return NF_DROP;
+            case DIRECTION_IN:
+                reroute_proxy_to_client_packet(&packet, skb);
+                break;
             }
         }
 
