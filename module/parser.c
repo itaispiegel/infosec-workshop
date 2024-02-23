@@ -30,36 +30,34 @@ static inline direction_t parse_direction(const struct nf_hook_state *state) {
 
 void parse_packet(packet_t *packet, const struct sk_buff *skb,
                   const struct nf_hook_state *state) {
-    struct iphdr *ip_header;
-    struct tcphdr *tcp_header;
-    struct udphdr *udp_header;
 
-    ip_header = ip_hdr(skb);
+    packet->ip_header = ip_hdr(skb);
 
-    packet->src_ip = ip_header->saddr;
-    packet->dst_ip = ip_header->daddr;
-    packet->protocol = ip_header->protocol;
+    packet->src_ip = packet->ip_header->saddr;
+    packet->dst_ip = packet->ip_header->daddr;
+    packet->protocol = packet->ip_header->protocol;
     packet->direction = parse_direction(state);
 
     // TODO: Support local packets.
     // Notice that we the store the exact ports, even if they're above 1023.
     if (packet->protocol == PROT_TCP) {
-        tcp_header = tcp_hdr(skb);
-        packet->src_port = tcp_header->source;
-        packet->dst_port = tcp_header->dest;
-        packet->ack = tcp_header->ack;
-        if (tcp_header->fin && tcp_header->psh && tcp_header->urg) {
+        packet->tcp_header = tcp_hdr(skb);
+        packet->src_port = packet->tcp_header->source;
+        packet->dst_port = packet->tcp_header->dest;
+        packet->ack = packet->tcp_header->ack;
+        if (packet->tcp_header->fin && packet->tcp_header->psh &&
+            packet->tcp_header->urg) {
             packet->type = PACKET_TYPE_XMAS;
             return;
         } else {
             packet->type = PACKET_TYPE_NORMAL;
         }
-    } else if (ip_header->protocol == PROT_UDP) {
-        udp_header = udp_hdr(skb);
+    } else if (packet->ip_header->protocol == PROT_UDP) {
+        packet->udp_header = udp_hdr(skb);
         packet->type = PACKET_TYPE_NORMAL;
-        packet->src_port = udp_header->source;
-        packet->dst_port = udp_header->dest;
-    } else if (ip_header->protocol == PROT_ICMP) {
+        packet->src_port = packet->udp_header->source;
+        packet->dst_port = packet->udp_header->dest;
+    } else if (packet->ip_header->protocol == PROT_ICMP) {
         packet->type = PACKET_TYPE_NORMAL;
         packet->src_port = 0;
         packet->dst_port = 0;

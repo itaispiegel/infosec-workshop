@@ -189,7 +189,7 @@ static inline bool update_connection_state(struct tcphdr *tcp_header,
     return false;
 }
 
-void track_connection(packet_t *packet, struct tcphdr *tcp_header) {
+void track_connection(packet_t *packet) {
     struct tcp_connection_node *conn, *inverse_conn;
     struct socket_address saddr = {.addr = packet->src_ip,
                                    .port = packet->src_port};
@@ -219,7 +219,7 @@ void track_connection(packet_t *packet, struct tcphdr *tcp_header) {
             .saddr = saddr,
             .daddr = daddr,
         };
-        tcp_fsm_step(&conn->conn, OUTGOING, tcp_header);
+        tcp_fsm_step(&conn->conn, OUTGOING, packet->tcp_header);
         hash_add(tcp_connections, &conn->node, hash);
         printk(KERN_DEBUG
                "Tracking new TCP connection %pI4:%u --> %pI4:%u, hash=%u\n",
@@ -246,7 +246,7 @@ void track_connection(packet_t *packet, struct tcphdr *tcp_header) {
             .saddr = daddr,
             .daddr = saddr,
         };
-        tcp_fsm_step(&inverse_conn->conn, INCOMING, tcp_header);
+        tcp_fsm_step(&inverse_conn->conn, INCOMING, packet->tcp_header);
         hash_add(tcp_connections, &inverse_conn->node, inverse_hash);
         printk(KERN_DEBUG
                "Tracking new TCP connection %pI4:%u --> %pI4:%u, hash=%u\n",
@@ -255,16 +255,17 @@ void track_connection(packet_t *packet, struct tcphdr *tcp_header) {
     }
 }
 
-bool match_connection_and_update_state(packet_t packet,
-                                       struct tcphdr *tcp_header) {
+bool match_connection_and_update_state(packet_t packet) {
     bool matched = false;
     struct socket_address saddr = {.addr = packet.src_ip,
                                    .port = packet.src_port};
     struct socket_address daddr = {.addr = packet.dst_ip,
                                    .port = packet.dst_port};
 
-    matched = update_connection_state(tcp_header, saddr, daddr, OUTGOING);
-    matched |= update_connection_state(tcp_header, daddr, saddr, INCOMING);
+    matched =
+        update_connection_state(packet.tcp_header, saddr, daddr, OUTGOING);
+    matched |=
+        update_connection_state(packet.tcp_header, daddr, saddr, INCOMING);
     return matched;
 }
 
