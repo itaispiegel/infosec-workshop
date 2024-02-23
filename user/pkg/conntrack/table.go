@@ -10,7 +10,7 @@ import (
 
 const (
 	ConnsTableDeviceFile = "/sys/class/fw/conn/conns"
-	connectionBytesSize  = 13
+	connectionBytesSize  = 15
 )
 
 type connectionsSlice []Connection
@@ -30,11 +30,12 @@ func ReadConnections() (connectionsSlice, error) {
 }
 
 func (conns *connectionsSlice) Table() table.Table {
-	tbl := table.New("Source", "Dest", "State")
+	tbl := table.New("Source", "Dest", "ProxyPort", "State")
 	for _, conn := range *conns {
 		tbl.AddRow(
 			fmt.Sprintf("%s:%d", net.IP(conn.SrcIp[:]), conn.SrcPort),
 			fmt.Sprintf("%s:%d", net.IP(conn.DestIp[:]), conn.DestPort),
+			conn.ProxyPort,
 			conn.State,
 		)
 	}

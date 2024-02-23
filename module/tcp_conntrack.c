@@ -1,7 +1,6 @@
 #include "tcp_conntrack.h"
 
 #include <linux/jhash.h>
-#include <linux/siphash.h>
 #include <net/netfilter/nf_conntrack_tuple.h>
 
 #include "fw.h"
@@ -10,6 +9,9 @@ static DECLARE_HASHTABLE(tcp_connections, 8);
 
 static int conns_dev_major;
 static struct device *conns_dev;
+
+static int proxy_port_dev_major;
+static struct device *proxy_port_dev;
 
 static struct file_operations fops = {
     .owner = THIS_MODULE,
@@ -27,13 +29,31 @@ static ssize_t conns_table_show(struct device *dev,
     return offset;
 }
 
+static ssize_t proxy_port_store(struct device *dev,
+                                struct device_attribute *attr, const char *buf,
+                                size_t count) {
+    return 0;
+}
+
 static DEVICE_ATTR(conns, S_IRUSR, conns_table_show, NULL);
+static DEVICE_ATTR(proxy_port, S_IWUSR, NULL, proxy_port_store);
 
 static inline bool match_conn_addrs(struct tcp_connection *conn,
                                     struct socket_address *saddr,
                                     struct socket_address *daddr) {
     return conn->saddr.addr == saddr->addr && conn->saddr.port == saddr->port &&
            conn->daddr.addr == daddr->addr && conn->daddr.port == daddr->port;
+}
+
+static inline __u32 hash_conn_addrs(struct socket_address saddr,
+                                    struct socket_address daddr) {
+    return jhash2((u32[4]){saddr.addr, saddr.port, daddr.addr, daddr.port}, 4,
+                  0);
+}
+
+static inline void close_connection(struct tcp_connection_node *conn) {
+    hash_del(&conn->node);
+    kfree(conn);
 }
 
 static void tcp_fsm_step(struct tcp_connection *conn,
@@ -137,6 +157,37 @@ static void tcp_fsm_step(struct tcp_connection *conn,
     }
 }
 
+static struct tcp_connection_node *
+get_connection_node(struct socket_address saddr, struct socket_address daddr) {
+    struct tcp_connection_node *conn_node;
+    __u32 hash = hash_conn_addrs(saddr, daddr);
+    hash_for_each_possible(tcp_connections, conn_node, node, hash) {
+        if (match_conn_addrs(&conn_node->conn, &saddr, &daddr)) {
+            return conn_node;
+        }
+    }
+    return NULL;
+}
+
+static inline bool update_connection_state(struct tcphdr *tcp_header,
+                                           struct socket_address saddr,
+                                           struct socket_address daddr,
+                                           direction_t direction) {
+    struct tcp_connection_node *conn_node = get_connection_node(saddr, daddr);
+
+    if (conn_node == NULL) {
+        return false;
+    }
+    tcp_fsm_step(&conn_node->conn, direction, tcp_header);
+    if (conn_node->conn.state == TCP_CLOSE) {
+        printk(KERN_DEBUG "Removing closed connection from table "
+                          "%pI4:%u --> %pI4:%u\n",
+               &saddr.addr, saddr.port, &daddr.addr, daddr.port);
+        close_connection(conn_node);
+    }
+    return true;
+}
+
 bool init_connection(struct socket_address saddr, struct socket_address daddr,
                      struct tcphdr *tcp_header, __u32 hash,
                      enum connection_direction direction) {
@@ -156,39 +207,6 @@ bool init_connection(struct socket_address saddr, struct socket_address daddr,
     return true;
 }
 
-static inline void close_connection(struct tcp_connection_node *conn) {
-    hash_del(&conn->node);
-    kfree(conn);
-}
-
-static inline __u32 hash_conn_addrs(struct socket_address saddr,
-                                    struct socket_address daddr) {
-    return jhash2((u32[4]){saddr.addr, saddr.port, daddr.addr, daddr.port}, 4,
-                  0);
-}
-
-static inline bool update_connection_state(struct tcphdr *tcp_header,
-                                           struct socket_address saddr,
-                                           struct socket_address daddr,
-                                           direction_t direction) {
-    struct tcp_connection_node *conn;
-    __u32 hash = hash_conn_addrs(saddr, daddr);
-
-    hash_for_each_possible(tcp_connections, conn, node, hash) {
-        if (match_conn_addrs(&conn->conn, &saddr, &daddr)) {
-            tcp_fsm_step(&conn->conn, direction, tcp_header);
-            if (conn->conn.state == TCP_CLOSE) {
-                printk(KERN_DEBUG "Removing closed connection from table "
-                                  "%pI4:%u --> %pI4:%u\n",
-                       &saddr.addr, saddr.port, &daddr.addr, daddr.port);
-                close_connection(conn);
-            }
-            return true;
-        }
-    }
-    return false;
-}
-
 void track_connection(packet_t *packet) {
     struct tcp_connection_node *conn, *inverse_conn;
     struct socket_address saddr = {.addr = packet->src_ip,
@@ -198,16 +216,9 @@ void track_connection(packet_t *packet) {
     __u32 hash = hash_conn_addrs(saddr, daddr);
     __u32 inverse_hash = hash_conn_addrs(daddr, saddr);
 
-    bool outgoing_match = false, incoming_match = false;
-
-    hash_for_each_possible(tcp_connections, conn, node, hash) {
-        if (match_conn_addrs(&conn->conn, &saddr, &daddr)) {
-            outgoing_match = true;
-            break;
-        }
-    }
-
-    if (!outgoing_match) {
+    struct tcp_connection_node *existing_conn_node =
+        get_connection_node(saddr, daddr);
+    if (existing_conn_node == NULL) {
         conn = kmalloc(sizeof(struct tcp_connection_node), GFP_KERNEL);
         if (!conn) {
             printk(KERN_ERR "Failed to allocate memory for connection\n");
@@ -227,14 +238,8 @@ void track_connection(packet_t *packet) {
                be16_to_cpu(daddr.port), hash);
     }
 
-    hash_for_each_possible(tcp_connections, conn, node, hash) {
-        if (match_conn_addrs(&conn->conn, &daddr, &saddr)) {
-            incoming_match = true;
-            break;
-        }
-    }
-
-    if (!incoming_match) {
+    existing_conn_node = get_connection_node(daddr, saddr);
+    if (existing_conn_node == NULL) {
         inverse_conn = kmalloc(sizeof(struct tcp_connection_node), GFP_KERNEL);
         if (!inverse_conn) {
             printk(KERN_ERR "Failed to allocate memory for connection\n");
@@ -280,25 +285,57 @@ int init_tcp_conntrack(struct class *fw_sysfs_class) {
     conns_dev = device_create(fw_sysfs_class, NULL, MKDEV(conns_dev_major, 0),
                               NULL, DEVICE_NAME_CONNTRACK);
     if (IS_ERR(conns_dev)) {
-        goto unregister_chrdev;
+        goto unregister_conns_chrdev;
     }
 
     if (device_create_file(
             conns_dev, (const struct device_attribute *)&dev_attr_conns.attr)) {
-        goto device_destroy;
+        goto destroy_conns_dev;
     }
+
+    proxy_port_dev_major = register_chrdev(0, DEVICE_NAME_PROXY_PORT, &fops);
+    if (proxy_port_dev_major < 0) {
+        goto destroy_conns_dev_file;
+    }
+
+    proxy_port_dev =
+        device_create(fw_sysfs_class, NULL, MKDEV(proxy_port_dev_major, 0),
+                      NULL, DEVICE_NAME_PROXY_PORT);
+    if (IS_ERR(proxy_port_dev)) {
+        goto ungregister_proxy_port_chrdev;
+    }
+
+    if (device_create_file(
+            proxy_port_dev,
+            (const struct device_attribute *)&dev_attr_proxy_port.attr)) {
+        goto destroy_proxy_port_dev;
+    }
+
     return 0;
 
-device_destroy:
+destroy_proxy_port_dev:
+    device_destroy(fw_sysfs_class, MKDEV(proxy_port_dev_major, 0));
+ungregister_proxy_port_chrdev:
+    unregister_chrdev(conns_dev_major, DEVICE_NAME_PROXY_PORT);
+destroy_conns_dev_file:
+    device_remove_file(conns_dev,
+                       (const struct device_attribute *)&dev_attr_conns.attr);
+destroy_conns_dev:
     device_destroy(fw_sysfs_class, MKDEV(conns_dev_major, 0));
-unregister_chrdev:
-    unregister_chrdev(conns_dev_major, DEVICE_NAME_RULES);
+unregister_conns_chrdev:
+    unregister_chrdev(conns_dev_major, DEVICE_NAME_CONNTRACK);
     return -1;
 }
 
 void destroy_tcp_conntrack(struct class *fw_sysfs_class) {
     unsigned i;
     struct tcp_connection_node *cur;
+
+    device_remove_file(
+        proxy_port_dev,
+        (const struct device_attribute *)&dev_attr_proxy_port.attr);
+    device_destroy(fw_sysfs_class, MKDEV(proxy_port_dev_major, 0));
+    unregister_chrdev(proxy_port_dev_major, DEVICE_NAME_RULES);
 
     device_remove_file(conns_dev,
                        (const struct device_attribute *)&dev_attr_conns.attr);

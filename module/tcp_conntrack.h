@@ -20,7 +20,9 @@ struct socket_address {
 struct tcp_connection {
     struct socket_address saddr;
     struct socket_address daddr;
-    __u8 state; // Use the states from <net/tcp_states.h>
+    __be16 proxy_port; // Defined only for proxied connections, and set by the
+                       // userspace.
+    __u8 state;        // Use the states from <net/tcp_states.h>
 } __attribute__((packed));
 
 struct tcp_connection_node {

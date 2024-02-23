@@ -9,11 +9,12 @@ import (
 )
 
 type Connection struct {
-	SrcIp    [4]byte
-	SrcPort  uint16
-	DestIp   [4]byte
-	DestPort uint16
-	State    fwtypes.TcpState
+	SrcIp     [4]byte
+	SrcPort   uint16
+	DestIp    [4]byte
+	DestPort  uint16
+	ProxyPort uint16
+	State     fwtypes.TcpState
 }
 
 func Unmarshal(data []byte) *Connection {
@@ -23,6 +24,7 @@ func Unmarshal(data []byte) *Connection {
 	utils.PanicIfError(binary.Read(reader, binary.BigEndian, &conn.SrcPort))
 	utils.PanicIfError(binary.Read(reader, binary.BigEndian, &conn.DestIp))
 	utils.PanicIfError(binary.Read(reader, binary.BigEndian, &conn.DestPort))
+	utils.PanicIfError(binary.Read(reader, binary.LittleEndian, &conn.ProxyPort))
 	utils.PanicIfError(binary.Read(reader, binary.LittleEndian, &conn.State))
 	return &conn
 }
