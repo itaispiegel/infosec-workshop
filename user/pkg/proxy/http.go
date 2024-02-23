@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"fmt"
+	"io"
 	"net"
 	"strconv"
 	"strings"
@@ -41,6 +42,7 @@ func (p *HttpProxy) Start() error {
 }
 
 func (p *HttpProxy) handleConnection(conn net.Conn) {
+	defer conn.Close()
 	log.Debug().Msgf("Accepted connection from %s", conn.RemoteAddr())
 	srcAddrParts := strings.Split(conn.RemoteAddr().String(), ":")
 	srcIp := net.ParseIP(srcAddrParts[0])
@@ -50,12 +52,29 @@ func (p *HttpProxy) handleConnection(conn net.Conn) {
 		log.Error().Err(err).Msg("Error looking up destination address")
 		return
 	}
-
 	log.Info().Msgf("Forwarding to %s", destAddr)
-	conn.Write([]byte("HTTP/1.1 200 OK\r\n" +
-		"Content-Length: 14\r\n" +
-		"Content-Type: text/plain\r\n" +
-		"\r\n" +
-		"Hello, World!\n"))
-	conn.Close()
+
+	serverConn, err := net.DialTCP("tcp4", nil, destAddr)
+	if err != nil {
+		log.Error().Err(err).Str("destAddr", destAddr.String()).Msg("Error connecting to destination")
+		return
+	}
+
+	done := make(chan struct{})
+	go func() {
+		defer conn.Close()
+		defer serverConn.Close()
+		io.Copy(serverConn, conn)
+		done <- struct{}{}
+	}()
+
+	go func() {
+		defer conn.Close()
+		defer serverConn.Close()
+		io.Copy(conn, serverConn)
+		done <- struct{}{}
+	}()
+
+	<-done
+	<-done
 }

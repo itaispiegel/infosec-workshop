@@ -12,7 +12,7 @@ type Proxy interface {
 	handleConnection() error
 }
 
-func lookupDestinationAddr(srcIp [4]byte, srcPort uint16) (net.Addr, error) {
+func lookupDestinationAddr(srcIp [4]byte, srcPort uint16) (*net.TCPAddr, error) {
 	connections, err := conntrack.ReadConnections()
 	if err != nil {
 		return nil, err
