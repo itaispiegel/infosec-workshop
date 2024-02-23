@@ -22,12 +22,14 @@ static const struct nf_hook_ops nf_prerouting_op = {
     .hook = netfilter_hook_func,
     .pf = NFPROTO_IPV4,
     .hooknum = NF_INET_PRE_ROUTING,
+    .priority = NF_IP_PRI_FIRST,
 };
 
 static const struct nf_hook_ops nf_local_out_op = {
     .hook = netfilter_hook_func,
     .pf = NFPROTO_IPV4,
     .hooknum = NF_INET_LOCAL_OUT,
+    .priority = NF_IP_PRI_FIRST,
 };
 
 static inline bool match_direction(rule_t *rule, packet_t *packet) {
@@ -139,31 +141,35 @@ static unsigned int netfilter_hook_func(void *priv, struct sk_buff *skb,
     __u8 i, verdict;
     packet_t packet;
     bool matched;
-    struct tcphdr *tcp_header;
 
     parse_packet(&packet, skb, state);
 
     // TODO: Handle local packets
-    if (packet.type == PACKET_TYPE_LOOPBACK ||
-        packet.type == PACKET_TYPE_UNHANDLED_PROTOCOL) {
+    switch (packet.type) {
+    case PACKET_TYPE_LOOPBACK:
+    case PACKET_TYPE_UNHANDLED_PROTOCOL:
         // In this case we want to accept the packet without logging it.
         return NF_ACCEPT;
-    } else if (packet.type == PACKET_TYPE_XMAS) {
+    case PACKET_TYPE_XMAS:
         update_log_entry_by_packet(&packet, REASON_XMAS_PACKET, NF_DROP);
         return NF_DROP;
+    default:
+        break;
     }
 
     // In these cases, the packet must be a normal packet.
+    // TODO: Need to update log
     if (packet.protocol == PROT_TCP) {
-        // TODO: Need to update log
-        tcp_header = tcp_hdr(skb);
+        switch (state->hook) {
+        case NF_INET_LOCAL_OUT:
+            proxy_server_response(&packet, skb);
+        case NF_INET_PRE_ROUTING:
+            proxy_client_request(&packet, skb);
+        }
+
         if (packet.ack) {
-            matched = match_connection_and_update_state(packet, tcp_header);
-            if (!matched) {
-                return NF_DROP;
-            }
-            proxy_packet(&packet, skb);
-            return NF_ACCEPT;
+            matched = match_connection_and_update_state(packet, tcp_hdr(skb));
+            return NF_ACCEPT ? matched : NF_DROP;
         }
     }
 
@@ -172,8 +178,7 @@ static unsigned int netfilter_hook_func(void *priv, struct sk_buff *skb,
             verdict = rules[i].action;
             update_log_entry_by_packet(&packet, i, verdict);
             if (verdict == NF_ACCEPT && packet.protocol == PROT_TCP) {
-                track_connection(&packet, tcp_header);
-                proxy_packet(&packet, skb);
+                track_connection(&packet, tcp_hdr(skb));
             }
             return verdict;
         }

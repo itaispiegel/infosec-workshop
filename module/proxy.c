@@ -25,19 +25,30 @@ static void fix_checksum(struct sk_buff *skb, struct iphdr *ip_header,
     // }
 }
 
-void proxy_packet(packet_t *packet, struct sk_buff *skb) {
+void proxy_client_request(packet_t *packet, struct sk_buff *skb) {
     struct iphdr *ip_header = ip_hdr(skb);
     struct tcphdr *tcp_header = tcp_hdr(skb);
-
     if (packet->dst_port == HTTP_PORT_BE) {
-        printk(KERN_DEBUG
-               "(No ACK) Changing destination port from 80 to 800\n");
         tcp_header->dest = HTTP_PROXY_PORT_BE;
         ip_header->daddr = 0x0301010a;
-    } else if (packet->src_port == HTTP_PROXY_PORT_BE) {
-        printk(KERN_DEBUG "(No ACK) Changing source port from 800 to 80\n");
-        tcp_header->source = HTTP_PORT_BE;
-        ip_header->saddr = 0x0202010a;
+        fix_checksum(skb, ip_header, tcp_header);
+        printk(KERN_DEBUG "Proxying client request %pI4:%u --> %pI4:%u\n",
+               &ip_header->saddr, ntohs(tcp_header->source), &ip_header->daddr,
+               ntohs(tcp_header->dest));
     }
-    fix_checksum(skb, ip_header, tcp_header);
+}
+
+void proxy_server_response(packet_t *packet, struct sk_buff *skb) {
+    struct iphdr *ip_header = ip_hdr(skb);
+    struct tcphdr *tcp_header = tcp_hdr(skb);
+    if (packet->src_port == HTTP_PROXY_PORT_BE) {
+        packet->src_port = HTTP_PORT_BE;
+        tcp_header->source = HTTP_PORT_BE;
+        packet->src_ip = 0x0202010a;
+        ip_header->saddr = 0x0202010a;
+        fix_checksum(skb, ip_header, tcp_header);
+        printk(KERN_DEBUG "Proxying server response %pI4:%u --> %pI4:%u\n",
+               &ip_header->saddr, ntohs(tcp_header->source), &ip_header->daddr,
+               ntohs(tcp_header->dest));
+    }
 }

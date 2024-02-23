@@ -161,10 +161,10 @@ static inline void close_connection(struct tcp_connection_node *conn) {
     kfree(conn);
 }
 
-static inline __u32 hash_conn_addrs(struct socket_address *saddr,
-                                    struct socket_address *daddr) {
-    return jhash2((u32[4]){saddr->addr, saddr->port, daddr->addr, daddr->port},
-                  4, 0);
+static inline __u32 hash_conn_addrs(struct socket_address saddr,
+                                    struct socket_address daddr) {
+    return jhash2((u32[4]){saddr.addr, saddr.port, daddr.addr, daddr.port}, 4,
+                  0);
 }
 
 static inline bool update_connection_state(struct tcphdr *tcp_header,
@@ -172,7 +172,7 @@ static inline bool update_connection_state(struct tcphdr *tcp_header,
                                            struct socket_address daddr,
                                            direction_t direction) {
     struct tcp_connection_node *conn;
-    __u32 hash = hash_conn_addrs(&saddr, &daddr);
+    __u32 hash = hash_conn_addrs(saddr, daddr);
 
     hash_for_each_possible(tcp_connections, conn, node, hash) {
         if (match_conn_addrs(&conn->conn, &saddr, &daddr)) {
@@ -195,51 +195,73 @@ void track_connection(packet_t *packet, struct tcphdr *tcp_header) {
                                    .port = packet->src_port};
     struct socket_address daddr = {.addr = packet->dst_ip,
                                    .port = packet->dst_port};
-    __u32 hash = hash_conn_addrs(&saddr, &daddr);
-    __u32 inverse_hash = hash_conn_addrs(&daddr, &saddr);
+    __u32 hash = hash_conn_addrs(saddr, daddr);
+    __u32 inverse_hash = hash_conn_addrs(daddr, saddr);
 
-    conn = kmalloc(sizeof(struct tcp_connection_node), GFP_KERNEL);
-    if (!conn) {
-        printk(KERN_ERR "Failed to allocate memory for connection\n");
-        return;
+    bool outgoing_match = false, incoming_match = false;
+
+    hash_for_each_possible(tcp_connections, conn, node, hash) {
+        if (match_conn_addrs(&conn->conn, &saddr, &daddr)) {
+            outgoing_match = true;
+            break;
+        }
     }
 
-    conn->conn = (struct tcp_connection){
-        .state = TCP_CLOSE,
-        .saddr = saddr,
-        .daddr = daddr,
-    };
-    tcp_fsm_step(&conn->conn, OUTGOING, tcp_header);
-    hash_add(tcp_connections, &conn->node,
-             hash); // TODO: Can this add the same item twice?
-    printk(KERN_DEBUG "Tracking new TCP connection %pI4:%u --> %pI4:%u\n",
-           &saddr.addr, be16_to_cpu(saddr.port), &daddr.addr,
-           be16_to_cpu(daddr.port));
+    if (!outgoing_match) {
+        conn = kmalloc(sizeof(struct tcp_connection_node), GFP_KERNEL);
+        if (!conn) {
+            printk(KERN_ERR "Failed to allocate memory for connection\n");
+            return;
+        }
 
-    inverse_conn = kmalloc(sizeof(struct tcp_connection_node), GFP_KERNEL);
-    if (!inverse_conn) {
-        printk(KERN_ERR "Failed to allocate memory for connection\n");
-        return;
+        conn->conn = (struct tcp_connection){
+            .state = TCP_CLOSE,
+            .saddr = saddr,
+            .daddr = daddr,
+        };
+        tcp_fsm_step(&conn->conn, OUTGOING, tcp_header);
+        hash_add(tcp_connections, &conn->node, hash);
+        printk(KERN_DEBUG
+               "Tracking new TCP connection %pI4:%u --> %pI4:%u, hash=%u\n",
+               &saddr.addr, be16_to_cpu(saddr.port), &daddr.addr,
+               be16_to_cpu(daddr.port), hash);
     }
 
-    inverse_conn->conn = (struct tcp_connection){
-        .state = TCP_CLOSE,
-        .saddr = daddr,
-        .daddr = saddr,
-    };
-    tcp_fsm_step(&inverse_conn->conn, INCOMING, tcp_header);
-    hash_add(tcp_connections, &inverse_conn->node, inverse_hash);
-    printk(KERN_DEBUG "Tracking new TCP connection %pI4:%u --> %pI4:%u\n",
-           &daddr.addr, daddr.port, &saddr.addr, saddr.port);
+    hash_for_each_possible(tcp_connections, conn, node, hash) {
+        if (match_conn_addrs(&conn->conn, &daddr, &saddr)) {
+            incoming_match = true;
+            break;
+        }
+    }
+
+    if (!incoming_match) {
+        inverse_conn = kmalloc(sizeof(struct tcp_connection_node), GFP_KERNEL);
+        if (!inverse_conn) {
+            printk(KERN_ERR "Failed to allocate memory for connection\n");
+            return;
+        }
+
+        inverse_conn->conn = (struct tcp_connection){
+            .state = TCP_CLOSE,
+            .saddr = daddr,
+            .daddr = saddr,
+        };
+        tcp_fsm_step(&inverse_conn->conn, INCOMING, tcp_header);
+        hash_add(tcp_connections, &inverse_conn->node, inverse_hash);
+        printk(KERN_DEBUG
+               "Tracking new TCP connection %pI4:%u --> %pI4:%u, hash=%u\n",
+               &daddr.addr, be16_to_cpu(daddr.port), &saddr.addr,
+               be16_to_cpu(saddr.port), inverse_hash);
+    }
 }
 
 bool match_connection_and_update_state(packet_t packet,
                                        struct tcphdr *tcp_header) {
+    bool matched = false;
     struct socket_address saddr = {.addr = packet.src_ip,
                                    .port = packet.src_port};
     struct socket_address daddr = {.addr = packet.dst_ip,
                                    .port = packet.dst_port};
-    bool matched = false;
 
     matched = update_connection_state(tcp_header, saddr, daddr, OUTGOING);
     matched |= update_connection_state(tcp_header, daddr, saddr, INCOMING);
