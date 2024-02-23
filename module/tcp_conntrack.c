@@ -335,12 +335,12 @@ void destroy_tcp_conntrack(struct class *fw_sysfs_class) {
         proxy_port_dev,
         (const struct device_attribute *)&dev_attr_proxy_port.attr);
     device_destroy(fw_sysfs_class, MKDEV(proxy_port_dev_major, 0));
-    unregister_chrdev(proxy_port_dev_major, DEVICE_NAME_RULES);
+    unregister_chrdev(proxy_port_dev_major, DEVICE_NAME_PROXY_PORT);
 
     device_remove_file(conns_dev,
                        (const struct device_attribute *)&dev_attr_conns.attr);
     device_destroy(fw_sysfs_class, MKDEV(conns_dev_major, 0));
-    unregister_chrdev(conns_dev_major, DEVICE_NAME_RULES);
+    unregister_chrdev(conns_dev_major, DEVICE_NAME_CONNTRACK);
 
     hash_for_each(tcp_connections, i, cur, node) { close_connection(cur); }
 }

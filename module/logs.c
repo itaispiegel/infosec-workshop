@@ -90,7 +90,7 @@ int init_show_logs_device(struct class *fw_sysfs_class) {
     return 0;
 
 unregister_chrdev:
-    unregister_chrdev(show_logs_dev_major, DEVICE_NAME_RULES);
+    unregister_chrdev(show_logs_dev_major, DEVICE_NAME_SHOW_LOGS);
     return -1;
 }
 
@@ -119,7 +119,7 @@ int init_reset_logs_device(struct class *fw_sysfs_class) {
 device_destroy:
     device_destroy(fw_sysfs_class, MKDEV(reset_logs_dev_major, 0));
 unregister_chrdev:
-    unregister_chrdev(reset_logs_dev_major, DEVICE_NAME_RULES);
+    unregister_chrdev(reset_logs_dev_major, DEVICE_NAME_RESET_LOGS);
     return -1;
 }
 
@@ -127,12 +127,12 @@ void destroy_show_logs_device(struct class *fw_sysfs_class) {
     device_remove_file(show_logs_dev,
                        (const struct device_attribute *)&dev_attr_reset.attr);
     device_destroy(fw_sysfs_class, MKDEV(show_logs_dev_major, 0));
-    unregister_chrdev(show_logs_dev_major, DEVICE_NAME_RULES);
+    unregister_chrdev(show_logs_dev_major, DEVICE_NAME_SHOW_LOGS);
 }
 
 void destroy_reset_logs_device(struct class *fw_sysfs_class) {
     device_remove_file(reset_logs_dev,
                        (const struct device_attribute *)&dev_attr_reset.attr);
     device_destroy(fw_sysfs_class, MKDEV(reset_logs_dev_major, 0));
-    unregister_chrdev(reset_logs_dev_major, DEVICE_NAME_RULES);
+    unregister_chrdev(reset_logs_dev_major, DEVICE_NAME_RESET_LOGS);
 }
