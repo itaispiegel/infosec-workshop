@@ -4,6 +4,8 @@
 #include <linux/device.h>
 #include <linux/list.h>
 
+#include "types.h"
+
 #define DEVICE_NAME_LOG "log"
 #define DEVICE_NAME_SHOW_LOGS "fw_log"
 #define DEVICE_NAME_RESET_LOGS "reset"
@@ -22,7 +24,7 @@ typedef enum {
 
 typedef struct {
     unsigned long timestamp; // time of creation/update
-    unsigned char protocol;  // values from: prot_t
+    prot_t protocol;         // values from: prot_t
     unsigned char action;    // valid values: NF_ACCEPT, NF_DROP
     __be32 src_ip;   // if you use this struct in userspace, change the type to
                      // unsigned int

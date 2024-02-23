@@ -5,6 +5,7 @@
 #include <linux/hashtable.h>
 
 #include "parser.h"
+#include "types.h"
 
 #define DEVICE_NAME_CONNTRACK "conn"
 #define DEVICE_NAME_PROXY_PORT "proxy_port"

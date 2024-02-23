@@ -1,7 +1,7 @@
 #ifndef _RULES_H
 #define _RULES_H
 
-#include "direction.h"
+#include "types.h"
 
 #define MAX_RULES (50)
 #define DEVICE_NAME_RULES "rules"

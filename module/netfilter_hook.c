@@ -9,6 +9,7 @@
 #include "proxy.h"
 #include "rules.h"
 #include "tcp_conntrack.h"
+#include "types.h"
 
 #define PORT_ANY (0)
 #define PORT_ABOVE_1023 (1023)
