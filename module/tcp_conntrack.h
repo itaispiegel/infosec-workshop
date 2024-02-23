@@ -28,9 +28,8 @@ struct tcp_connection_node {
     struct hlist_node node;
 };
 
-void track_connection(packet_t *packet, struct tcphdr *tcp_header);
-bool match_connection_and_update_state(packet_t packet,
-                                       struct tcphdr *tcp_header);
+void track_connection(packet_t *packet);
+bool match_connection_and_update_state(packet_t packet);
 int init_tcp_conntrack(struct class *fw_sysfs_class);
 void destroy_tcp_conntrack(struct class *fw_sysfs_class);
 

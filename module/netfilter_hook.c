@@ -161,22 +161,26 @@ static unsigned int netfilter_hook_func(void *priv, struct sk_buff *skb,
     // TODO: Need to update log
     if (packet.protocol == PROT_TCP) {
         switch (state->hook) {
-        case NF_INET_LOCAL_OUT:
-            proxy_server_response(&packet, skb);
-            if (packet.src_ip == 0x0302010a && packet.dst_ip == 0x0202010a) {
-                printk(KERN_DEBUG "Accepting packet sent to 10.1.2.2\n");
-                return NF_ACCEPT;
-            }
         case NF_INET_PRE_ROUTING:
             proxy_client_request(&packet, skb);
-            if (packet.dst_ip == 0x0302010a && packet.src_ip == 0x0202010a) {
-                printk(KERN_DEBUG "Accepting packet sent from 10.1.2.2\n");
+
+            // Handle packets received from the external network.
+            if (packet.direction == DIRECTION_IN &&
+                packet.dst_ip == FW_EXTERNAL_PROXY_IP) {
+                return NF_ACCEPT;
+            }
+        case NF_INET_LOCAL_OUT:
+            proxy_server_response(&packet, skb);
+
+            // Handle packets sent to the external network.
+            if (packet.direction == DIRECTION_OUT &&
+                packet.src_ip == FW_EXTERNAL_PROXY_IP) {
                 return NF_ACCEPT;
             }
         }
 
         if (packet.ack) {
-            matched = match_connection_and_update_state(packet, tcp_hdr(skb));
+            matched = match_connection_and_update_state(packet);
             return NF_ACCEPT ? matched : NF_DROP;
         }
     }
@@ -186,7 +190,7 @@ static unsigned int netfilter_hook_func(void *priv, struct sk_buff *skb,
             verdict = rules[i].action;
             update_log_entry_by_packet(&packet, i, verdict);
             if (verdict == NF_ACCEPT && packet.protocol == PROT_TCP) {
-                track_connection(&packet, tcp_hdr(skb));
+                track_connection(&packet);
             }
             return verdict;
         }
