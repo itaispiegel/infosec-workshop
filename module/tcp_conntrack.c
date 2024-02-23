@@ -1,9 +1,11 @@
 #include "tcp_conntrack.h"
 
+#include <linux/device.h>
+#include <linux/fs.h>
 #include <linux/jhash.h>
 #include <net/netfilter/nf_conntrack_tuple.h>
 
-#include "fw.h"
+#include "direction.h"
 
 static DECLARE_HASHTABLE(tcp_connections, 8);
 

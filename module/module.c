@@ -1,7 +1,11 @@
+#include <linux/module.h>
+
 #include "logs.h"
 #include "netfilter_hook.h"
-#include "rules_table.h"
+#include "rules.h"
 #include "tcp_conntrack.h"
+
+#define CLASS_NAME "fw"
 
 MODULE_AUTHOR("Itai Spiegel");
 MODULE_LICENSE("GPL");

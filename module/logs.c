@@ -1,7 +1,9 @@
+#include <linux/device.h>
 #include <linux/export.h>
 #include <linux/fs.h>
+#include <linux/slab.h>
+#include <linux/uaccess.h>
 
-#include "fw.h"
 #include "logs.h"
 
 LIST_HEAD(logs_list);

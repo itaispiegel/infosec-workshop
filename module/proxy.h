@@ -5,6 +5,11 @@
 
 #include "parser.h"
 
+#define HTTP_PORT_BE (be16_to_cpu(80))
+#define HTTP_PROXY_PORT_BE (be16_to_cpu(800))
+#define FTP_PORT_BE (be16_to_cpu(21))
+#define FTP_PROXY_PORT_BE (be16_to_cpu(210))
+
 #define FW_INTERNAL_PROXY_IP 0x0301010a
 #define FW_EXTERNAL_PROXY_IP 0x0302010a
 

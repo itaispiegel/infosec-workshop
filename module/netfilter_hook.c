@@ -1,13 +1,18 @@
 #include <linux/ip.h>
 #include <linux/list.h>
 #include <linux/netfilter.h>
+#include <linux/netfilter_ipv4.h>
 
-#include "fw.h"
 #include "logs.h"
 #include "netfilter_hook.h"
 #include "parser.h"
 #include "proxy.h"
+#include "rules.h"
 #include "tcp_conntrack.h"
+
+#define PORT_ANY (0)
+#define PORT_ABOVE_1023 (1023)
+#define PORT_ABOVE_1023_BE (be16_to_cpu(PORT_ABOVE_1023))
 
 extern struct list_head logs_list;
 extern size_t logs_count;

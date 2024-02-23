@@ -1,6 +1,5 @@
 #include <net/tcp.h>
 
-#include "fw.h"
 #include "proxy.h"
 
 static void fix_checksum(struct sk_buff *skb, struct iphdr *ip_header,
