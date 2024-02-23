@@ -163,8 +163,16 @@ static unsigned int netfilter_hook_func(void *priv, struct sk_buff *skb,
         switch (state->hook) {
         case NF_INET_LOCAL_OUT:
             proxy_server_response(&packet, skb);
+            if (packet.src_ip == 0x0302010a && packet.dst_ip == 0x0202010a) {
+                printk(KERN_DEBUG "Accepting packet sent to 10.1.2.2\n");
+                return NF_ACCEPT;
+            }
         case NF_INET_PRE_ROUTING:
             proxy_client_request(&packet, skb);
+            if (packet.dst_ip == 0x0302010a && packet.src_ip == 0x0202010a) {
+                printk(KERN_DEBUG "Accepting packet sent from 10.1.2.2\n");
+                return NF_ACCEPT;
+            }
         }
 
         if (packet.ack) {
