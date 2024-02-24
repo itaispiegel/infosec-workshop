@@ -11,7 +11,6 @@ import (
 
 	"github.com/itaispiegel/infosec-workshop/user/pkg/conntrack"
 	"github.com/itaispiegel/infosec-workshop/user/pkg/utils"
-	"github.com/rs/zerolog/log"
 )
 
 const (
@@ -33,8 +32,6 @@ func lookupPeerAddr(addr net.Addr) (*net.TCPAddr, error) {
 	addrIp := [4]byte(net.ParseIP(addrParts[0]).To4())
 	addrPortInt, _ := strconv.Atoi(addrParts[1])
 	addrPort := uint16(addrPortInt)
-
-	log.Debug().Str("addr", addr.String()).Msg("Looking up peer address")
 
 	for _, conn := range connections {
 		if conn.SrcIp == addrIp && conn.SrcPort == uint16(addrPort) {

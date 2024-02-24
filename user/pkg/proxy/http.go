@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -48,13 +49,13 @@ func (p *HttpProxy) Start() error {
 func (p *HttpProxy) handleConnection(proxyToClientConn net.Conn) {
 	defer proxyToClientConn.Close()
 	clientAddr := proxyToClientConn.RemoteAddr()
-	log.Debug().Msgf("Accepted connection from %s", clientAddr)
+	log.Debug().Msgf("Accepted connection from %s. "+
+		"Looking up server address from the connections table", clientAddr)
 	serverAddr, err := lookupPeerAddr(clientAddr)
 	if err != nil {
 		log.Error().Err(err).Msg("Error looking up server address in the connections table")
 		return
 	}
-	log.Info().Str("serverAddr", serverAddr.String()).Msg("Forwarding session to server")
 
 	proxyToServerConn, err := connectToServer(clientAddr, serverAddr)
 	if err != nil {
@@ -63,23 +64,45 @@ func (p *HttpProxy) handleConnection(proxyToClientConn net.Conn) {
 	}
 	defer proxyToServerConn.Close()
 
+	log.Info().
+		Str("clientAddr", clientAddr.String()).
+		Str("serverAddr", serverAddr.String()).
+		Str("proxyAddr", proxyToServerConn.LocalAddr().String()).
+		Msg("Forwarding session to server")
+
 	done := make(chan struct{})
-	go func() {
-		defer proxyToClientConn.Close()
-		defer proxyToServerConn.Close()
-		io.Copy(proxyToServerConn, proxyToClientConn)
-		done <- struct{}{}
-	}()
-
-	go func() {
-		defer proxyToClientConn.Close()
-		defer proxyToServerConn.Close()
-		io.Copy(proxyToClientConn, proxyToServerConn)
-		done <- struct{}{}
-	}()
+	go forwardConnections(proxyToServerConn, proxyToClientConn, done)
+	go forwardConnections(proxyToClientConn, proxyToServerConn, done)
 
 	<-done
 	<-done
+
+	log.Info().
+		Str("clientAddr", clientAddr.String()).
+		Str("serverAddr", serverAddr.String()).
+		Str("proxyAddr", proxyToServerConn.LocalAddr().String()).
+		Msg("Closed forwarding connection")
+}
+
+func forwardConnections(source, dest net.Conn, done chan struct{}) {
+	buffer := make([]byte, 1024)
+	for {
+		n, err := source.Read(buffer)
+		if errors.Is(err, io.EOF) {
+			dest.Close()
+			done <- struct{}{}
+			return
+		} else if errors.Is(err, net.ErrClosed) {
+			done <- struct{}{}
+			return
+		} else if err != nil {
+			log.Error().Err(err).Msg("Error reading from server")
+			done <- struct{}{}
+			return
+		} else {
+			dest.Write(buffer[:n])
+		}
+	}
 }
 
 func connectToServer(clientAddr net.Addr, serverAddr *net.TCPAddr) (net.Conn, error) {
@@ -100,7 +123,6 @@ func connectToServer(clientAddr net.Addr, serverAddr *net.TCPAddr) (net.Conn, er
 	}
 
 	proxyPort := uint16(sockAddr.(*syscall.SockaddrInet4).Port)
-	log.Debug().Uint16("proxyPort", proxyPort).Msgf("Setting proxy port")
 	setProxyPort(clientAddr, serverAddr, proxyPort)
 
 	if err := syscall.Connect(proxyToServerSock, &syscall.SockaddrInet4{Port: serverAddr.Port, Addr: [4]byte(serverAddr.AddrPort().Addr().As4())}); err != nil {
