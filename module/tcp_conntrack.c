@@ -69,10 +69,6 @@ static ssize_t proxy_port_store(struct device *dev,
     }
 
     conn_node->conn.proxy_port = proxy_port;
-    printk(KERN_DEBUG
-           "Proxy port set to %u for connection %pI4:%u --> %pI4:%u\n",
-           be16_to_cpu(proxy_port), &saddr.addr, be16_to_cpu(saddr.port),
-           &daddr.addr, be16_to_cpu(daddr.port));
     return expected_count;
 }
 
@@ -197,7 +193,7 @@ static inline bool update_connection_state(struct tcphdr *tcp_header,
     tcp_fsm_step(&conn_node->conn, direction, tcp_header);
     if (conn_node->conn.state == TCP_CLOSE) {
         printk(KERN_DEBUG "Removing closed connection from table "
-                          "%pI4:%u --> %pI4:%u\n",
+                          "%pI4:%u-->%pI4:%u\n",
                &saddr.addr, saddr.port, &daddr.addr, daddr.port);
         close_connection(conn_node);
     }
@@ -217,16 +213,15 @@ lookup_tcp_connection_node(struct socket_address saddr,
     return NULL;
 }
 
-struct socket_address lookup_client_address_by_proxy_port(__be16 proxy_port) {
+struct tcp_connection *lookup_tcp_connection_by_proxy_port(__be16 proxy_port) {
     unsigned i;
     struct tcp_connection_node *conn_node;
-    struct socket_address client_addr = {.addr = 0, .port = 0};
     hash_for_each(tcp_connections, i, conn_node, node) {
         if (conn_node->conn.proxy_port == proxy_port) {
-            return conn_node->conn.saddr;
+            return &conn_node->conn;
         }
     }
-    return client_addr;
+    return NULL;
 }
 
 struct socket_address
@@ -275,10 +270,8 @@ void track_one_sided_connection(packet_t *packet, direction_t direction) {
         hash = hash_conn_addrs(saddr, daddr);
         tcp_fsm_step(&conn->conn, direction, packet->tcp_header);
         hash_add(tcp_connections, &conn->node, hash);
-        printk(KERN_DEBUG
-               "Tracking new TCP connection %pI4:%u --> %pI4:%u, hash=%u\n",
-               &saddr.addr, be16_to_cpu(saddr.port), &daddr.addr,
-               be16_to_cpu(daddr.port), hash);
+        printk(KERN_DEBUG "Tracking new TCP connection %pI4:%u-->%pI4:%u\n",
+               &saddr.addr, ntohs(saddr.port), &daddr.addr, ntohs(daddr.port));
     }
 }
 

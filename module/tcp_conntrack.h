@@ -42,10 +42,10 @@ lookup_tcp_connection_node(struct socket_address saddr,
                            struct socket_address daddr);
 
 /**
- * @deprecated
+ * TODO: Document this function.
  */
-struct socket_address
-lookup_client_address_by_proxy_port(__be16 proxy_port); // Deprecated
+struct tcp_connection *
+lookup_tcp_connection_by_proxy_port(__be16 proxy_port); // Deprecated
 
 /**
  * Looks up the server address in a session with the given client.
