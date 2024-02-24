@@ -48,11 +48,15 @@ void reroute_proxy_to_client_packet(packet_t *packet, struct sk_buff *skb) {
 }
 
 bool is_server_to_proxy_response(packet_t *packet, struct sk_buff *skb) {
-    // TODO: Match by proxy port.
-    return packet->dst_ip == FW_EXTERNAL_PROXY_IP;
+    __be16 proxy_port = packet->dst_port;
+    struct tcp_connection *tcp_conn =
+        lookup_tcp_connection_by_proxy_port(proxy_port);
+    return packet->dst_ip == FW_EXTERNAL_PROXY_IP && tcp_conn != NULL;
 }
 
 bool is_proxy_to_server_request(packet_t *packet, struct sk_buff *skb) {
-    // TODO: Match by proxy port.
-    return packet->src_ip == FW_EXTERNAL_PROXY_IP;
+    __be16 proxy_port = packet->src_port;
+    struct tcp_connection *tcp_conn =
+        lookup_tcp_connection_by_proxy_port(proxy_port);
+    return packet->src_ip == FW_EXTERNAL_PROXY_IP && tcp_conn != NULL;
 }
