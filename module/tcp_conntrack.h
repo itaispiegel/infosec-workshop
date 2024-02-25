@@ -33,6 +33,8 @@ struct tcp_connection_node {
 
 /**
  * Looks up the connection node in the connections hash table.
+ * The function looks up the address pair in the hash table, so the runtime is
+ * O(1).
  * @param saddr The source address of the connection.
  * @param daddr The destination address of the connection.
  * @return The connection node if found, NULL otherwise.
@@ -42,13 +44,23 @@ lookup_tcp_connection_node(struct socket_address saddr,
                            struct socket_address daddr);
 
 /**
- * TODO: Document this function.
+ * Looks up the connection in the connections hash table by the TCP port used by
+ * the proxy to communicate with the server.
+ * The key of the hash table is the hash of the addresses, so in this function
+ * we have to iterate all items of the table to find the relevant connection, so
+ * the runtime is O(n).
+ * TODO: Optimize this function to run in O(1) time.
+ * @param proxy_port The proxy port.
+ * @return The connection if found, NULL otherwise.
  */
-struct tcp_connection *
-lookup_tcp_connection_by_proxy_port(__be16 proxy_port); // Deprecated
+struct tcp_connection *lookup_tcp_connection_by_proxy_port(__be16 proxy_port);
 
 /**
  * Looks up the server address in a session with the given client.
+ * The key of the hash table is the hash of both addresses, so to find the
+ * connection we have to iterate all items and find the matching one, so the
+ * runtime is O(n).
+ * TODO: Optimize this function to run in O(1) time.
  * @param client_addr The client address.
  * @return The server address if found, 0 otherwise.
  */
