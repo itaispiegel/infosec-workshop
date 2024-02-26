@@ -194,6 +194,10 @@ static unsigned int netfilter_hook_func(void *priv, struct sk_buff *skb,
                 return NF_DROP;
             case DIRECTION_IN:
                 reroute_proxy_to_client_packet(&packet, skb);
+                if (packet.src_ip == 0 && packet.src_port) {
+                    printk("Dropping packet with unknown source\n");
+                    return NF_DROP;
+                }
                 break;
             }
         }
