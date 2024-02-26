@@ -45,34 +45,47 @@ static ssize_t reset_logs_store(struct device *dev,
 
 static DEVICE_ATTR(reset, S_IWUSR, NULL, reset_logs_store);
 
+/**
+ * Read the logs from the logs list and write them to the character device.
+ * The device supports reading from arbitrary offsets, but they must be a
+ * multiple of the log row size.
+ * If the offset is greater than the number of logs in the list, or if the read
+ * size is less than a single log row, the function will return zero bytes.
+ */
 ssize_t show_logs_dev_read(struct file *filp, char __user *buf, size_t len,
                            loff_t *off) {
     struct log_entry *log_entry;
     struct list_head *pos;
+    ssize_t i = 0, skip = 0, bytes_read = 0;
 
     if (*off >= logs_count * sizeof(log_row_t)) {
-        return 0;
+        return 0; // EOF
     }
 
-    // We currently don't support reading from a specific offset.
-    if (*off > 0 || len <= sizeof(log_row_t)) {
+    if ((ssize_t)*off % sizeof(log_row_t) != 0) {
         return -EINVAL;
     }
 
+    skip = (ssize_t)*off / sizeof(log_row_t);
     list_for_each(pos, &logs_list) {
-        if (*off + sizeof(log_row_t) > len) {
-            return -EINVAL;
+        if (bytes_read + sizeof(log_row_t) > len) {
+            break;
+        }
+        if (i < skip) {
+            i++;
+            continue;
         }
 
         log_entry = list_entry(pos, struct log_entry, list);
-        if (copy_to_user(buf + *off, &(log_entry->log_row),
-                         sizeof(log_row_t))) {
+        if (copy_to_user(buf + bytes_read, &(log_entry->log_row),
+                         sizeof(log_row_t)) != 0) {
             return -EFAULT;
         }
-        *off += sizeof(log_row_t);
+        bytes_read += sizeof(log_row_t);
     }
 
-    return *off;
+    *off += bytes_read;
+    return bytes_read;
 }
 
 int init_show_logs_device(struct class *fw_sysfs_class) {
