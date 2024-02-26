@@ -1,6 +1,8 @@
 package logs
 
 import (
+	"errors"
+	"io"
 	"net"
 	"os"
 
@@ -20,17 +22,25 @@ var (
 )
 
 func ReadFromDevice() (logsSlice, error) {
-	buf, err := os.ReadFile(ReadLogsDeviceFile)
+	logsFile, err := os.Open(ReadLogsDeviceFile)
 	if err != nil {
 		return nil, err
 	}
+	defer logsFile.Close()
 
-	logs := []Log{}
-	for i := 0; i < len(buf); i += logBytesSize {
-		logs = append(logs, *Unmarshal(buf[i : i+logBytesSize]))
+	buffer := make([]byte, 44*logBytesSize) // 44 * logByteSize is just under 1024 bytes
+	logs := logsSlice{}
+	for {
+		bytesRead, err := logsFile.Read(buffer)
+		if errors.Is(err, io.EOF) {
+			return logs, nil
+		} else if err != nil {
+			return nil, err
+		}
+		for i := 0; i < bytesRead; i += logBytesSize {
+			logs = append(logs, *Unmarshal(buffer[i : i+logBytesSize]))
+		}
 	}
-
-	return logs, nil
 }
 
 func ClearLogsDevice() error {
