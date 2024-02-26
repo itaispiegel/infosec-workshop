@@ -9,7 +9,6 @@
 #include "types.h"
 
 typedef enum {
-    PACKET_TYPE_LOCAL,
     PACKET_TYPE_NORMAL,
     PACKET_TYPE_XMAS,
     PACKET_TYPE_UNHANDLED_PROTOCOL,
