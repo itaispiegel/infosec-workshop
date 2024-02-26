@@ -6,8 +6,8 @@
 #define IN_NET_DEVICE_NAME "enp0s8"
 #define OUT_NET_DEVICE_NAME "enp0s9"
 
-static const __be32 LOOPBACK_PREFIX = 0x7f000000;
-static const __be32 LOOPBACK_MASK = 0xff000000;
+static const __be32 LOOPBACK_PREFIX = 0x0000007f;
+static const __be32 LOOPBACK_MASK = 0x000000ff;
 
 static inline bool is_loopback_addr(__be32 addr) {
     return (addr & LOOPBACK_MASK) == LOOPBACK_PREFIX;
