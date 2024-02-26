@@ -39,10 +39,10 @@ void reroute_proxy_to_client_packet(packet_t *packet, struct sk_buff *skb) {
                                          .port = packet->dst_port};
     if (packet->src_port == HTTP_PROXY_PORT_BE) {
         server_addr = lookup_server_address_by_client_address(client_addr);
-        packet->src_port = server_addr.port;
-        packet->tcp_header->source = server_addr.port;
         packet->src_ip = server_addr.addr;
         packet->ip_header->saddr = server_addr.addr;
+        packet->src_port = server_addr.port;
+        packet->tcp_header->source = server_addr.port;
         fix_checksum(skb, packet->ip_header, packet->tcp_header);
     }
 }
