@@ -179,7 +179,9 @@ static unsigned int netfilter_hook_func(void *priv, struct sk_buff *skb,
                 if (is_server_to_proxy_response(&packet, skb)) {
                     return NF_ACCEPT;
                 }
-                return NF_DROP;
+                // It might be possible in this case that we accept a packet
+                // designated to the firewall host, but according to the
+                // guidelines we can ignore this case.
             }
             break;
         case NF_INET_LOCAL_OUT:
@@ -191,6 +193,8 @@ static unsigned int netfilter_hook_func(void *priv, struct sk_buff *skb,
                 if (is_proxy_to_server_request(&packet, skb)) {
                     return NF_ACCEPT;
                 }
+                printk(KERN_DEBUG
+                       "Dropping packet that wasn't sent by the proxy\n");
                 return NF_DROP;
             case DIRECTION_IN:
                 reroute_proxy_to_client_packet(&packet, skb);

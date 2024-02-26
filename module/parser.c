@@ -34,15 +34,12 @@ static inline direction_t parse_direction(const struct nf_hook_state *state) {
 
 void parse_packet(packet_t *packet, const struct sk_buff *skb,
                   const struct nf_hook_state *state) {
-
     packet->ip_header = ip_hdr(skb);
-
     packet->src_ip = packet->ip_header->saddr;
     packet->dst_ip = packet->ip_header->daddr;
     packet->protocol = packet->ip_header->protocol;
     packet->direction = parse_direction(state);
 
-    // TODO: Support local packets.
     // Notice that we the store the exact ports, even if they're above 1023.
     if (packet->protocol == PROT_TCP) {
         packet->tcp_header = tcp_hdr(skb);
@@ -71,7 +68,6 @@ void parse_packet(packet_t *packet, const struct sk_buff *skb,
         // garbage.
     }
 
-    // TODO: Verify this implementation
     if (is_loopback_addr(packet->src_ip) || is_loopback_addr(packet->dst_ip)) {
         packet->type = PACKET_TYPE_LOOPBACK;
     }
