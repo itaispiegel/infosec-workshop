@@ -11,9 +11,6 @@
 #include "tcp_conntrack.h"
 #include "types.h"
 
-extern rule_t rules[MAX_RULES];
-extern __u8 rules_count;
-
 static unsigned int netfilter_hook_func(void *priv, struct sk_buff *skb,
                                         const struct nf_hook_state *state);
 
@@ -37,10 +34,10 @@ static unsigned int netfilter_hook_func(void *priv, struct sk_buff *skb,
     packet_t packet;
     bool matched;
     enum proxy_response proxy_response;
+    rule_t *matching_rule;
 
     parse_packet(&packet, skb, state);
 
-    // TODO: Handle local packets
     switch (packet.type) {
     case PACKET_TYPE_LOOPBACK:
     case PACKET_TYPE_UNHANDLED_PROTOCOL:
@@ -73,19 +70,17 @@ static unsigned int netfilter_hook_func(void *priv, struct sk_buff *skb,
         return verdict;
     }
 
-    for (i = 0; i < rules_count; i++) {
-        if (match_rule_packet(&rules[i], &packet)) {
-            verdict = rules[i].action;
-            update_log_entry_by_packet(&packet, i, verdict);
-            if (verdict == NF_ACCEPT && packet.protocol == PROT_TCP) {
-                track_two_sided_connection(&packet);
-            }
-            return verdict;
-        }
+    if ((matching_rule = lookup_matching_rule(&packet)) == NULL) {
+        update_log_entry_by_packet(&packet, REASON_NO_MATCHING_RULE, FW_POLICY);
+        return FW_POLICY;
     }
 
-    update_log_entry_by_packet(&packet, REASON_NO_MATCHING_RULE, FW_POLICY);
-    return FW_POLICY;
+    verdict = matching_rule->action;
+    update_log_entry_by_packet(&packet, i, verdict);
+    if (verdict == NF_ACCEPT && packet.protocol == PROT_TCP) {
+        track_two_sided_connection(&packet);
+    }
+    return verdict;
 }
 
 int init_netfilter_hook(void) {

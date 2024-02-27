@@ -33,16 +33,13 @@ typedef struct {
     __u8 action;     // valid values: NF_ACCEPT, NF_DROP
 } __attribute__((packed)) rule_t;
 
-extern rule_t rules[MAX_RULES];
-extern __u8 rules_count;
-
 /**
- * Match the given rule with the given packet.
- * @param rule The rule to match.
+ * Looks up the first rule matching the given packet and returns it.
+ * If no matching rule is found, the function returns NULL.
  * @param packet The packet to match.
- * @return True if the rule matches the packet, false otherwise.
+ * @return The first matching rule, or NULL if no matching rule is found.
  */
-inline bool match_rule_packet(rule_t *rule, packet_t *packet);
+rule_t *lookup_matching_rule(packet_t *packet);
 
 /**
  * Initialize the rules table device.

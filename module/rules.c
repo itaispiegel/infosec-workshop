@@ -7,8 +7,8 @@
 #define PORT_ABOVE_1023 (1023)
 #define PORT_ABOVE_1023_BE (be16_to_cpu(PORT_ABOVE_1023))
 
-rule_t rules[MAX_RULES] = {0};
-__u8 rules_count = 0;
+static rule_t rules[MAX_RULES] = {0};
+static __u8 rules_count = 0;
 
 static int rules_dev_major;
 static struct device *rules_dev;
@@ -92,10 +92,20 @@ static inline bool match_ack(rule_t *rule, packet_t *packet) {
                                      (rule->ack == ACK_NO && !packet->ack)));
 }
 
-inline bool match_rule_packet(rule_t *rule, packet_t *packet) {
+static inline bool match_rule_packet(rule_t *rule, packet_t *packet) {
     return match_direction(rule, packet) && match_ip_addrs(rule, packet) &&
            match_ports(rule, packet) && match_protocol(rule, packet) &&
            match_ack(rule, packet);
+}
+
+rule_t *lookup_matching_rule(packet_t *packet) {
+    __u8 i;
+    for (i = 0; i < rules_count; i++) {
+        if (match_rule_packet(&rules[i], packet)) {
+            return &rules[i];
+        }
+    }
+    return NULL;
 }
 
 int init_rules_table_device(struct class *fw_sysfs_class) {
