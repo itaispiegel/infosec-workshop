@@ -19,19 +19,16 @@ const (
 	setProxyPortFile = "/sys/class/fw/proxy_port/proxy_port"
 )
 
-// PacketFilter is a function that is called when data is received,
-// and returns a boolean reperesenting whether to allow the data to pass.
-type PacketFilter func(data []byte) bool
-
-// OnSessionRejectedCallback is a function that is called when a session is rejected.
-// It receives the connection to the client, so it can send custom data to it.
-type OnSessionRejectedCallback func(net.Conn)
+// PacketCallback is a function that is called when data is received.
+// It receives the data and the destination connection,
+// and returns a boolean indicating whether to close the connection.
+// It can use the dest connection to send custom data.
+type PacketCallback func(data []byte, dest net.Conn) bool
 
 type Proxy struct {
 	Address string
 	Port    uint16
-	PacketFilter
-	OnSessionRejectedCallback
+	PacketCallback
 }
 
 func (p *Proxy) Start() error {
@@ -108,15 +105,8 @@ func (p *Proxy) forwardConnections(source, dest net.Conn, done chan struct{}) {
 			done <- struct{}{}
 			return
 		} else {
-			if p.PacketFilter(buffer[:n]) {
-				dest.Write(buffer[:n])
-			} else {
-				if p.OnSessionRejectedCallback != nil {
-					log.Warn().Msg("Packet didn't pass filter, responding with the callback and closing the connection")
-					p.OnSessionRejectedCallback(dest)
-				} else {
-					log.Warn().Msg("Packet didn't pass filter, closing the connection")
-				}
+			if shouldClose := p.PacketCallback(buffer[:n], dest); shouldClose {
+				source.Close()
 				dest.Close()
 				done <- struct{}{}
 				return
