@@ -53,6 +53,16 @@ void update_log_entry_by_packet(packet_t *packet, reason_t reason,
                                 __u8 verdict);
 
 /**
+ * Updates the log for TCP packets with ACK or RST flags.
+ * As opposed to @ref update_log_entry_by_packet, this function ignores the
+ * direction of the packet.
+ * Also, we don't create new log rows here, since we assume that the connection
+ * is already established - so we already have a log row for it.
+ * @param packet The packet to match.
+ */
+void update_established_tcp_conn_log(packet_t *packet);
+
+/**
  * Initialize the device that shows the logs.
  * @param fw_sysfs_class The class to which the device will belong.
  * @return 0 on success, a negative value on failure.

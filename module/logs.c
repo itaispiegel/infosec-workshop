@@ -75,13 +75,24 @@ static inline log_row_t new_log_row_by_packet(packet_t *packet, reason_t reason,
     };
 }
 
-static inline bool log_entry_matches_packet(struct log_entry *log_entry,
-                                            packet_t *packet) {
-    return log_entry->log_row.protocol == packet->protocol &&
-           log_entry->log_row.src_ip == packet->src_ip &&
-           log_entry->log_row.dst_ip == packet->dst_ip &&
-           log_entry->log_row.src_port == packet->src_port &&
-           log_entry->log_row.dst_port == packet->dst_port;
+static bool log_entry_matches_packet(struct log_entry *log_entry,
+                                     packet_t *packet, direction_t direction) {
+    if (direction == DIRECTION_OUT) {
+        return log_entry->log_row.protocol == packet->protocol &&
+               log_entry->log_row.src_ip == packet->src_ip &&
+               log_entry->log_row.dst_ip == packet->dst_ip &&
+               log_entry->log_row.src_port == packet->src_port &&
+               log_entry->log_row.dst_port == packet->dst_port;
+    } else if (direction == DIRECTION_IN) {
+        return log_entry->log_row.protocol == packet->protocol &&
+               log_entry->log_row.src_ip == packet->dst_ip &&
+               log_entry->log_row.src_port == packet->dst_port &&
+               log_entry->log_row.dst_ip == packet->src_ip &&
+               log_entry->log_row.dst_port == packet->src_port;
+    } else {
+        return log_entry_matches_packet(log_entry, packet, DIRECTION_IN) ||
+               log_entry_matches_packet(log_entry, packet, DIRECTION_OUT);
+    }
 }
 
 void update_log_entry_by_packet(packet_t *packet, reason_t reason,
@@ -91,7 +102,7 @@ void update_log_entry_by_packet(packet_t *packet, reason_t reason,
     list_for_each(pos, &logs_list) {
         log_entry = list_entry(pos, struct log_entry, list);
         if (log_entry->log_row.reason == reason &&
-            log_entry_matches_packet(log_entry, packet)) {
+            log_entry_matches_packet(log_entry, packet, DIRECTION_OUT)) {
             log_entry->log_row.count++;
             log_entry->log_row.timestamp = ktime_get_real_seconds();
             return;
@@ -111,13 +122,19 @@ void update_log_entry_by_packet(packet_t *packet, reason_t reason,
     logs_count++;
 }
 
-/**
- * Read the logs from the logs list and write them to the character device.
- * The device supports reading from arbitrary offsets, but they must be a
- * multiple of the log row size.
- * If the offset is greater than the number of logs in the list, or if the read
- * size is less than a single log row, the function will return zero bytes.
- */
+void update_established_tcp_conn_log(packet_t *packet) {
+    struct log_entry *log_entry;
+    struct list_head *pos;
+    list_for_each(pos, &logs_list) {
+        log_entry = list_entry(pos, struct log_entry, list);
+        if (log_entry_matches_packet(log_entry, packet, DIRECTION_ANY)) {
+            log_entry->log_row.count++;
+            log_entry->log_row.timestamp = ktime_get_real_seconds();
+            return;
+        }
+    }
+}
+
 ssize_t show_logs_dev_read(struct file *filp, char __user *buf, size_t len,
                            loff_t *off) {
     struct log_entry *log_entry;
