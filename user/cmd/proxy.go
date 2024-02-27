@@ -8,7 +8,7 @@ import (
 const defaultAddress = "127.0.0.1"
 
 var addr string
-var port uint16
+var httpPort, ftpPort uint16
 
 var proxyCmd = &cobra.Command{
 	Use:   "proxy",
@@ -28,20 +28,20 @@ var ftpProxyCmd = &cobra.Command{
 }
 
 func executeHttpProxy(cmd *cobra.Command, args []string) error {
-	httpProxy := proxy.NewHttpProxy(addr, port)
+	httpProxy := proxy.NewHttpProxy(addr, httpPort)
 	return httpProxy.Start()
 }
 
 func executeFtpProxy(cmd *cobra.Command, args []string) error {
-	ftpProxy := proxy.NewFtpProxy(addr, port)
+	ftpProxy := proxy.NewFtpProxy(addr, ftpPort)
 	return ftpProxy.Start()
 }
 
 func init() {
 	httpProxyCmd.Flags().StringVar(&addr, "address", defaultAddress, "The address to listen on")
-	httpProxyCmd.Flags().Uint16Var(&port, "port", 800, "The port to listen on")
+	httpProxyCmd.Flags().Uint16Var(&httpPort, "port", 800, "The port to listen on")
 	ftpProxyCmd.Flags().StringVar(&addr, "address", defaultAddress, "The address to listen on")
-	ftpProxyCmd.Flags().Uint16Var(&port, "port", 800, "The port to listen on") // TODO: Fix this port
+	ftpProxyCmd.Flags().Uint16Var(&ftpPort, "port", 210, "The port to listen on")
 
 	proxyCmd.AddCommand(httpProxyCmd)
 	proxyCmd.AddCommand(ftpProxyCmd)
