@@ -34,12 +34,22 @@ typedef struct {
 } __attribute__((packed)) rule_t;
 
 /**
- * Looks up the first rule matching the given packet and returns it.
- * If no matching rule is found, the function returns NULL.
- * @param packet The packet to match.
- * @return The first matching rule, or NULL if no matching rule is found.
+ * A struct representing a result of looking up a rule in the rules table.
+ * The lookup result holds a pointer to the rule and its index.
+ * If the rule isn't found, the the pointer is NULL.
  */
-rule_t *lookup_matching_rule(packet_t *packet);
+typedef struct {
+    rule_t *rule;
+    __u8 index;
+} rule_lookup_result;
+
+/**
+ * Looks up the first rule matching the given packet and returns a lookup result
+ * containing it. If the rule isn't found, the pointer in the result is NULL.
+ * @param packet The packet to match.
+ * @return The a result of the first matching rule.
+ */
+rule_lookup_result lookup_matching_rule(packet_t *packet);
 
 /**
  * Initialize the rules table device.

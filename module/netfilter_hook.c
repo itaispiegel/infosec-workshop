@@ -30,11 +30,11 @@ static const struct nf_hook_ops nf_local_out_op = {
 
 static unsigned int netfilter_hook_func(void *priv, struct sk_buff *skb,
                                         const struct nf_hook_state *state) {
-    __u8 i, verdict;
+    __u8 verdict;
     packet_t packet;
     bool matched;
     enum proxy_response proxy_response;
-    rule_t *matching_rule;
+    rule_lookup_result matching_rule;
 
     parse_packet(&packet, skb, state);
 
@@ -70,13 +70,13 @@ static unsigned int netfilter_hook_func(void *priv, struct sk_buff *skb,
         return verdict;
     }
 
-    if ((matching_rule = lookup_matching_rule(&packet)) == NULL) {
+    if ((matching_rule = lookup_matching_rule(&packet)).rule == NULL) {
         update_log_entry_by_packet(&packet, REASON_NO_MATCHING_RULE, FW_POLICY);
         return FW_POLICY;
     }
 
-    verdict = matching_rule->action;
-    update_log_entry_by_packet(&packet, i, verdict);
+    verdict = matching_rule.rule->action;
+    update_log_entry_by_packet(&packet, matching_rule.index, verdict);
     if (verdict == NF_ACCEPT && packet.protocol == PROT_TCP) {
         track_two_sided_connection(&packet);
     }

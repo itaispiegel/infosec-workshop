@@ -98,14 +98,17 @@ static inline bool match_rule_packet(rule_t *rule, packet_t *packet) {
            match_ack(rule, packet);
 }
 
-rule_t *lookup_matching_rule(packet_t *packet) {
+rule_lookup_result lookup_matching_rule(packet_t *packet) {
+    rule_lookup_result matching_rule;
     __u8 i;
     for (i = 0; i < rules_count; i++) {
         if (match_rule_packet(&rules[i], packet)) {
-            return &rules[i];
+            matching_rule.rule = &rules[i];
+            matching_rule.index = i;
+            return matching_rule;
         }
     }
-    return NULL;
+    return matching_rule;
 }
 
 int init_rules_table_device(struct class *fw_sysfs_class) {
