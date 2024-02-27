@@ -4,6 +4,8 @@
 #include <linux/device.h>
 #include <linux/list.h>
 
+#include "parser.h"
+#include "rules.h"
 #include "types.h"
 
 #define DEVICE_NAME_LOG "log"
@@ -13,8 +15,6 @@
 #define RESET_MAGIC "reset"
 #define RESET_MAGIC_SIZE sizeof(RESET_MAGIC)
 
-extern struct list_head logs_list;
-extern size_t logs_count;
 typedef enum {
     REASON_FW_INACTIVE = -1,
     REASON_NO_MATCHING_RULE = -2,
@@ -42,6 +42,15 @@ struct log_entry {
     log_row_t log_row;
     struct list_head list;
 };
+
+/**
+ * Update the log entry matching a given packet, reason and verdict pair.
+ * @param packet The packet to match.
+ * @param reason The reason to match.
+ * @param verdict The packet's verdict.
+ */
+void update_log_entry_by_packet(packet_t *packet, reason_t reason,
+                                __u8 verdict);
 
 /**
  * Initialize the device that shows the logs.
