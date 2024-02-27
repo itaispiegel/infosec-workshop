@@ -12,6 +12,7 @@ import (
 
 	"github.com/itaispiegel/infosec-workshop/user/pkg/conntrack"
 	"github.com/itaispiegel/infosec-workshop/user/pkg/utils"
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
 
@@ -20,10 +21,10 @@ const (
 )
 
 // PacketCallback is a function that is called when data is received.
-// It receives the data and the destination connection,
+// It receives the data, the destination connection and the logger,
 // and returns a boolean indicating whether to close the connection.
 // It can use the dest connection to send custom data.
-type PacketCallback func(data []byte, dest net.Conn) bool
+type PacketCallback func(data []byte, dest net.Conn, logger zerolog.Logger) bool
 
 type Proxy struct {
 	Address string
@@ -53,7 +54,7 @@ func (p *Proxy) Start() error {
 func (p *Proxy) handleConnection(proxyToClientConn net.Conn) {
 	defer proxyToClientConn.Close()
 	clientAddr := proxyToClientConn.RemoteAddr().(*net.TCPAddr)
-	log.Debug().Msgf("Accepted connection from %s. "+
+	log.Info().Msgf("Accepted connection from %s. "+
 		"Looking up server address from the connections table", clientAddr)
 	serverAddr, err := lookupPeerAddr(clientAddr)
 	if err != nil {
@@ -105,7 +106,7 @@ func (p *Proxy) forwardConnections(source, dest net.Conn, done chan struct{}) {
 			done <- struct{}{}
 			return
 		} else {
-			if shouldClose := p.PacketCallback(buffer[:n], dest); shouldClose {
+			if shouldClose := p.PacketCallback(buffer[:n], dest, log.Logger); shouldClose {
 				source.Close()
 				dest.Close()
 				done <- struct{}{}

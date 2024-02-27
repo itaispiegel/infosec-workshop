@@ -5,9 +5,11 @@ import (
 	"net"
 	"net/http"
 	"strings"
+
+	"github.com/rs/zerolog"
 )
 
-func blockCsvCallback(data []byte, dest net.Conn) bool {
+func blockCsvCallback(data []byte, dest net.Conn, logger zerolog.Logger) bool {
 	if !strings.Contains(string(data), "Content-Type: text/csv") {
 		dest.Write(data)
 		return false
@@ -26,6 +28,9 @@ func blockCsvCallback(data []byte, dest net.Conn) bool {
 		}
 
 		resp.Write(dest)
+		logger.Warn().Str("srcAddr", dest.LocalAddr().String()).
+			Str("destAddr", dest.RemoteAddr().String()).
+			Msg("Blocked CSV file")
 		return true
 	}
 }

@@ -1,20 +1,19 @@
 package proxy
 
-import "fmt"
+import (
+	"net"
 
-type FtpProxy struct {
-	Address string
-	Port    uint16
+	"github.com/rs/zerolog"
+)
+
+func allowFtpDataConnection(data []byte, dest net.Conn, logger zerolog.Logger) bool {
+	return false
 }
 
-func NewFtpProxy(address string, port uint16) *FtpProxy {
-	return &FtpProxy{
-		Address: address,
-		Port:    port,
+func NewFtpProxy(address string, port uint16) *Proxy {
+	return &Proxy{
+		Address:        address,
+		Port:           port,
+		PacketCallback: allowFtpDataConnection,
 	}
-}
-
-func (p *FtpProxy) Start() error {
-	fmt.Println("Starting FTP proxy server on port", p.Port)
-	return nil
 }
