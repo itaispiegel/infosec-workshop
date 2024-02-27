@@ -10,9 +10,9 @@ import (
 )
 
 func blockCsvCallback(data []byte, dest net.Conn, logger zerolog.Logger) bool {
-	if !strings.Contains(string(data), "Content-Type: text/csv") {
+	var isValid bool
+	if isValid = !strings.Contains(string(data), "Content-Type: text/csv"); !isValid {
 		dest.Write(data)
-		return false
 	} else {
 		msg := "Blocked by Firewall\n"
 		readerCloser := io.NopCloser(strings.NewReader(msg))
@@ -31,12 +31,13 @@ func blockCsvCallback(data []byte, dest net.Conn, logger zerolog.Logger) bool {
 		logger.Warn().Str("srcAddr", dest.LocalAddr().String()).
 			Str("destAddr", dest.RemoteAddr().String()).
 			Msg("Blocked CSV file")
-		return true
 	}
+	return isValid
 }
 
 func NewHttpProxy(address string, port uint16) *Proxy {
 	return &Proxy{
+		Protocol:       "http",
 		Address:        address,
 		Port:           port,
 		PacketCallback: blockCsvCallback,

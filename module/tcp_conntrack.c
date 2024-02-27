@@ -7,11 +7,15 @@
 
 static DECLARE_HASHTABLE(tcp_connections, 8);
 
+// TODO: Unite the devices under a joined hierarchy
 static int conns_dev_major;
 static struct device *conns_dev;
 
 static int proxy_port_dev_major;
 static struct device *proxy_port_dev;
+
+static int related_conns_dev_major;
+static struct device *related_conns_dev;
 
 static struct file_operations fops = {
     .owner = THIS_MODULE,
@@ -72,8 +76,63 @@ static ssize_t proxy_port_store(struct device *dev,
     return expected_count;
 }
 
+static ssize_t related_conns_store(struct device *dev,
+                                   struct device_attribute *attr,
+                                   const char *buf, size_t count) {
+    __u32 hash;
+    struct tcp_connection_node *conn_node;
+    struct socket_address saddr;
+    struct socket_address daddr;
+
+    size_t expected_count =
+        sizeof(struct socket_address) + sizeof(struct socket_address);
+    if (count != expected_count) {
+        return -EINVAL;
+    }
+
+    memcpy(&saddr, buf, sizeof(struct socket_address));
+    memcpy(&daddr, buf + sizeof(struct socket_address),
+           sizeof(struct socket_address));
+
+    // TODO: Extract a function for adding a new connection.x
+    conn_node = kmalloc(sizeof(struct tcp_connection_node), GFP_KERNEL);
+    if (!conn_node) {
+        printk(KERN_ERR "Failed to allocate memory for connection\n");
+        return ENOMEM;
+    }
+
+    conn_node->conn = (struct tcp_connection){
+        .state = TCP_CLOSE,
+        .saddr = saddr,
+        .daddr = daddr,
+    };
+    hash = hash_conn_addrs(saddr, daddr);
+    hash_add(tcp_connections, &conn_node->node, hash);
+    printk(KERN_DEBUG "Tracking new TCP connection %pI4:%u-->%pI4:%u\n",
+           &saddr.addr, ntohs(saddr.port), &daddr.addr, ntohs(daddr.port));
+
+    conn_node = kmalloc(sizeof(struct tcp_connection_node), GFP_KERNEL);
+    if (!conn_node) {
+        printk(KERN_ERR "Failed to allocate memory for connection\n");
+        return ENOMEM;
+    }
+
+    conn_node->conn = (struct tcp_connection){
+        .state = TCP_LISTEN,
+        .saddr = daddr,
+        .daddr = saddr,
+    };
+    hash = hash_conn_addrs(daddr, saddr);
+    hash_add(tcp_connections, &conn_node->node, hash);
+    printk(KERN_DEBUG "Tracking new TCP connection %pI4:%u-->%pI4:%u\n",
+           &daddr.addr, ntohs(daddr.port), &saddr.addr, ntohs(saddr.port));
+
+    return expected_count;
+}
+
 static DEVICE_ATTR(conns, S_IRUSR, conns_table_show, NULL);
 static DEVICE_ATTR(proxy_port, S_IWUSR, NULL, proxy_port_store);
+static DEVICE_ATTR(related_conns, S_IWUSR, NULL, related_conns_store);
 
 static inline void close_connection(struct tcp_connection_node *conn) {
     hash_del(&conn->node);
@@ -320,7 +379,7 @@ int init_tcp_conntrack(struct class *fw_sysfs_class) {
 
     proxy_port_dev_major = register_chrdev(0, DEVICE_NAME_PROXY_PORT, &fops);
     if (proxy_port_dev_major < 0) {
-        goto destroy_conns_dev_file;
+        goto remove_conns_dev_file;
     }
 
     proxy_port_dev =
@@ -336,13 +395,40 @@ int init_tcp_conntrack(struct class *fw_sysfs_class) {
         goto destroy_proxy_port_dev;
     }
 
+    related_conns_dev_major =
+        register_chrdev(0, DEVICE_NAME_RELATED_CONNS, &fops);
+    if (related_conns_dev_major < 0) {
+        goto remove_proxy_port_file;
+    }
+
+    related_conns_dev =
+        device_create(fw_sysfs_class, NULL, MKDEV(related_conns_dev_major, 0),
+                      NULL, DEVICE_NAME_RELATED_CONNS);
+    if (IS_ERR(related_conns_dev)) {
+        goto unregister_related_conns_dev;
+    }
+
+    if (device_create_file(
+            related_conns_dev,
+            (const struct device_attribute *)&dev_attr_related_conns.attr)) {
+        goto destroy_related_conns_dev;
+    }
+
     return 0;
 
+destroy_related_conns_dev:
+    device_destroy(fw_sysfs_class, MKDEV(related_conns_dev_major, 0));
+unregister_related_conns_dev:
+    unregister_chrdev(related_conns_dev_major, DEVICE_NAME_RELATED_CONNS);
+remove_proxy_port_file:
+    device_remove_file(
+        proxy_port_dev,
+        (const struct device_attribute *)&dev_attr_proxy_port.attr);
 destroy_proxy_port_dev:
     device_destroy(fw_sysfs_class, MKDEV(proxy_port_dev_major, 0));
 ungregister_proxy_port_chrdev:
     unregister_chrdev(conns_dev_major, DEVICE_NAME_PROXY_PORT);
-destroy_conns_dev_file:
+remove_conns_dev_file:
     device_remove_file(conns_dev,
                        (const struct device_attribute *)&dev_attr_conns.attr);
 destroy_conns_dev:
@@ -355,6 +441,12 @@ unregister_conns_chrdev:
 void destroy_tcp_conntrack(struct class *fw_sysfs_class) {
     unsigned i;
     struct tcp_connection_node *cur;
+
+    device_remove_file(
+        related_conns_dev,
+        (const struct device_attribute *)&dev_attr_proxy_port.attr);
+    device_destroy(fw_sysfs_class, MKDEV(related_conns_dev_major, 0));
+    unregister_chrdev(related_conns_dev_major, DEVICE_NAME_RELATED_CONNS);
 
     device_remove_file(
         proxy_port_dev,

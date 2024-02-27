@@ -71,8 +71,14 @@ enum proxy_response handle_proxy_packet(packet_t *packet, struct sk_buff *skb,
 }
 
 void reroute_client_to_server_packet(packet_t *packet, struct sk_buff *skb) {
+    __be16 proxy_port = 0;
     if (packet->dst_port == HTTP_PORT_BE) {
-        packet->tcp_header->dest = HTTP_PROXY_PORT_BE;
+        proxy_port = HTTP_PROXY_PORT_BE;
+    } else if (packet->dst_port == FTP_PORT_BE) {
+        proxy_port = FTP_PROXY_PORT_BE;
+    }
+    if (proxy_port != 0) {
+        packet->tcp_header->dest = proxy_port;
         packet->ip_header->daddr = FW_INTERNAL_PROXY_IP;
         fix_checksum(skb, packet->ip_header, packet->tcp_header);
     }
@@ -82,7 +88,8 @@ void reroute_proxy_to_client_packet(packet_t *packet, struct sk_buff *skb) {
     struct socket_address server_addr;
     struct socket_address client_addr = {.addr = packet->dst_ip,
                                          .port = packet->dst_port};
-    if (packet->src_port == HTTP_PROXY_PORT_BE) {
+    if (packet->src_port == HTTP_PROXY_PORT_BE ||
+        packet->src_port == FTP_PROXY_PORT_BE) {
         server_addr = lookup_server_address_by_client_address(client_addr);
         packet->src_ip = server_addr.addr;
         packet->ip_header->saddr = server_addr.addr;
