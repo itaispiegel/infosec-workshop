@@ -3,6 +3,7 @@ package conntrack
 import (
 	"bytes"
 	"encoding/binary"
+	"net"
 
 	"github.com/itaispiegel/infosec-workshop/user/pkg/fwtypes"
 	"github.com/itaispiegel/infosec-workshop/user/pkg/utils"
@@ -15,6 +16,16 @@ type Connection struct {
 	DestPort  uint16
 	ProxyPort uint16
 	State     fwtypes.TcpState
+}
+
+func NewConnection(srcAddr, destAddr *net.TCPAddr) *Connection {
+	return &Connection{
+		SrcIp:    srcAddr.AddrPort().Addr().As4(),
+		SrcPort:  uint16(srcAddr.Port),
+		DestIp:   destAddr.AddrPort().Addr().As4(),
+		DestPort: uint16(destAddr.Port),
+		State:    fwtypes.TcpClose,
+	}
 }
 
 func Unmarshal(data []byte) *Connection {

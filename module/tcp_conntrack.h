@@ -9,6 +9,7 @@
 
 #define DEVICE_NAME_CONNTRACK "conn"
 #define DEVICE_NAME_PROXY_PORT "proxy_port"
+#define DEVICE_NAME_RELATED_CONNS "related_conns"
 
 struct socket_address {
     __be32 addr;

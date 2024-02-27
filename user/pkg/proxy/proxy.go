@@ -22,13 +22,14 @@ const (
 
 // PacketCallback is a function that is called when data is received.
 // It receives the data, the destination connection and the logger,
-// and returns a boolean indicating whether to close the connection.
+// and returns a boolean indicating whether the connection is valid.
 // It can use the dest connection to send custom data.
 type PacketCallback func(data []byte, dest net.Conn, logger zerolog.Logger) bool
 
 type Proxy struct {
-	Address string
-	Port    uint16
+	Protocol string
+	Address  string
+	Port     uint16
 	PacketCallback
 }
 
@@ -40,7 +41,7 @@ func (p *Proxy) Start() error {
 	}
 	defer proxyListener.Close()
 
-	log.Info().Msgf("Started HTTP proxy server on %s", bindAddr)
+	log.Info().Msgf("Started %s proxy server on %s", p.Protocol, bindAddr)
 	for {
 		clientConn, err := proxyListener.Accept()
 		if err != nil {
@@ -98,6 +99,7 @@ func (p *Proxy) forwardConnections(source, dest net.Conn, done chan struct{}) {
 			done <- struct{}{}
 			return
 		} else if errors.Is(err, net.ErrClosed) {
+			dest.Close()
 			done <- struct{}{}
 			return
 		} else if err != nil {
@@ -106,7 +108,7 @@ func (p *Proxy) forwardConnections(source, dest net.Conn, done chan struct{}) {
 			done <- struct{}{}
 			return
 		} else {
-			if shouldClose := p.PacketCallback(buffer[:n], dest, log.Logger); shouldClose {
+			if isValid := p.PacketCallback(buffer[:n], dest, log.Logger); !isValid {
 				source.Close()
 				dest.Close()
 				done <- struct{}{}
