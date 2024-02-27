@@ -19,25 +19,30 @@ const (
 	setProxyPortFile = "/sys/class/fw/proxy_port/proxy_port"
 )
 
-// DataCallback is a function that is called when data is received,
-// and returns a boolean reperesenting whether to pass the data on
-type DataCallback func(data []byte) bool
+// PacketFilter is a function that is called when data is received,
+// and returns a boolean reperesenting whether to allow the data to pass.
+type PacketFilter func(data []byte) bool
+
+// OnSessionRejectedCallback is a function that is called when a session is rejected.
+// It receives the connection to the client, so it can send custom data to it.
+type OnSessionRejectedCallback func(net.Conn)
 
 type Proxy struct {
 	Address string
 	Port    uint16
-	DataCallback
+	PacketFilter
+	OnSessionRejectedCallback
 }
 
 func (p *Proxy) Start() error {
 	bindAddr := fmt.Sprintf("%s:%d", p.Address, p.Port)
-	log.Info().Msgf("Starting HTTP proxy server on %s", bindAddr)
 	proxyListener, err := net.Listen("tcp4", bindAddr)
 	if err != nil {
 		return err
 	}
 	defer proxyListener.Close()
 
+	log.Info().Msgf("Started HTTP proxy server on %s", bindAddr)
 	for {
 		clientConn, err := proxyListener.Accept()
 		if err != nil {
@@ -103,10 +108,15 @@ func (p *Proxy) forwardConnections(source, dest net.Conn, done chan struct{}) {
 			done <- struct{}{}
 			return
 		} else {
-			if p.DataCallback(buffer[:n]) {
+			if p.PacketFilter(buffer[:n]) {
 				dest.Write(buffer[:n])
 			} else {
-				log.Warn().Msg("Packet didn't pass callback, closing connection")
+				if p.OnSessionRejectedCallback != nil {
+					log.Warn().Msg("Packet didn't pass filter, responding with the callback and closing the connection")
+					p.OnSessionRejectedCallback(dest)
+				} else {
+					log.Warn().Msg("Packet didn't pass filter, closing the connection")
+				}
 				dest.Close()
 				done <- struct{}{}
 				return
