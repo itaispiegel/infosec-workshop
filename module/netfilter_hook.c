@@ -59,7 +59,6 @@ static unsigned int netfilter_hook_func(void *priv, struct sk_buff *skb,
     }
 
     // In these cases, the packet must be a normal packet.
-    // TODO: Need to update log
     proxy_response = handle_proxy_packet(&packet, skb, state);
     if (proxy_response == ACCEPT_IMMEDIATELY) {
         return NF_ACCEPT;
@@ -70,7 +69,7 @@ static unsigned int netfilter_hook_func(void *priv, struct sk_buff *skb,
     if (packet.protocol == PROT_TCP && (packet.ack || packet.tcp_header->rst)) {
         matched = match_connection_and_update_state(packet);
         verdict = matched ? NF_ACCEPT : NF_DROP;
-        // update_log_entry_by_packet(&packet, i, verdict);
+        update_established_tcp_conn_log(&packet);
         return verdict;
     }
 
