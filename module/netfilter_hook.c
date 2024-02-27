@@ -147,6 +147,7 @@ static unsigned int netfilter_hook_func(void *priv, struct sk_buff *skb,
     __u8 i, verdict;
     packet_t packet;
     bool matched;
+    enum proxy_response proxy_response;
 
     parse_packet(&packet, skb, state);
 
@@ -163,55 +164,25 @@ static unsigned int netfilter_hook_func(void *priv, struct sk_buff *skb,
         break;
     }
 
+    if (packet.direction == DIRECTION_ANY) {
+        printk(KERN_WARNING "Dropping packet with unknown direction\n");
+        return NF_DROP;
+    }
+
     // In these cases, the packet must be a normal packet.
     // TODO: Need to update log
-    if (packet.protocol == PROT_TCP) {
-        switch (state->hook) {
-        case NF_INET_PRE_ROUTING:
-            switch (packet.direction) {
-            case DIRECTION_ANY:
-                printk(KERN_WARNING "Dropping packet with unknown direction\n");
-                return NF_DROP;
-            case DIRECTION_OUT:
-                reroute_client_to_server_packet(&packet, skb);
-                break;
-            case DIRECTION_IN:
-                if (is_server_to_proxy_response(&packet, skb)) {
-                    return NF_ACCEPT;
-                }
-                // It might be possible in this case that we accept a packet
-                // designated to the firewall host, but according to the
-                // guidelines we can ignore this case.
-            }
-            break;
-        case NF_INET_LOCAL_OUT:
-            switch (packet.direction) {
-            case DIRECTION_ANY:
-                printk(KERN_WARNING "Dropping packet with unknown direction\n");
-                return NF_DROP;
-            case DIRECTION_OUT:
-                if (is_proxy_to_server_request(&packet, skb)) {
-                    return NF_ACCEPT;
-                }
-                printk(KERN_DEBUG
-                       "Dropping packet that wasn't sent by the proxy\n");
-                return NF_DROP;
-            case DIRECTION_IN:
-                reroute_proxy_to_client_packet(&packet, skb);
-                if (packet.src_ip == 0 && packet.src_port) {
-                    printk("Dropping packet with unknown source\n");
-                    return NF_DROP;
-                }
-                break;
-            }
-        }
+    proxy_response = handle_proxy_packet(&packet, skb, state);
+    if (proxy_response == ACCEPT_IMMEDIATELY) {
+        return NF_ACCEPT;
+    } else if (proxy_response == DROP_IMMEDIATELY) {
+        return NF_DROP;
+    }
 
-        if (packet.ack) {
-            matched = match_connection_and_update_state(packet);
-            verdict = matched ? NF_ACCEPT : NF_DROP;
-            // update_log_entry_by_packet(&packet, i, verdict);
-            return verdict;
-        }
+    if (packet.protocol == PROT_TCP && (packet.ack || packet.tcp_header->rst)) {
+        matched = match_connection_and_update_state(packet);
+        verdict = matched ? NF_ACCEPT : NF_DROP;
+        // update_log_entry_by_packet(&packet, i, verdict);
+        return verdict;
     }
 
     for (i = 0; i < rules_count; i++) {

@@ -14,6 +14,34 @@
 #define FW_EXTERNAL_PROXY_IP 0x0302010a
 
 /**
+ * The possible responses to a packet that is handled by the proxy.
+ * ACCEPT_IMMEDIATELY: The packet is accepted and the connection isn't tracked.
+ * DROP_IMMEDIATELY: The packet is dropped and the connection isn't tracked.
+ * CONTINUE: The packet isn't handled by the proxy, and the connection is
+ * tracked.
+ * NOT_PROXY_PACKET: The packet isn't handled by the proxy.
+ */
+enum proxy_response {
+    ACCEPT_IMMEDIATELY,
+    DROP_IMMEDIATELY,
+    CONTINUE,
+    NOT_PROXY_PACKET,
+};
+
+/**
+ * Receives any type of packet and handle it according to the proxy, and returns
+ * the action to be taken. This function modifies the packet and skb structs
+ * according to the action it takes, but keeps the invariant that the addresses
+ * in the packet struct are of the client and the server.
+ * @param packet The packet struct that represents the packet.
+ * @param skb The SKB struct that represents the packet.
+ * @param state The state of the Netfilter hook.
+ * @return The action to be taken.
+ */
+enum proxy_response handle_proxy_packet(packet_t *packet, struct sk_buff *skb,
+                                        const struct nf_hook_state *state);
+
+/**
  * Receives a TCP packet sent from a client in the internal network, to a server
  * in the external network.
  * If the packet is an HTTP or FTP packet, the destination IP and port will be
