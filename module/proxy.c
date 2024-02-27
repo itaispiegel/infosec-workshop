@@ -25,6 +25,51 @@ static void fix_checksum(struct sk_buff *skb, struct iphdr *ip_header,
     // }
 }
 
+enum proxy_response handle_proxy_packet(packet_t *packet, struct sk_buff *skb,
+                                        const struct nf_hook_state *state) {
+    if (packet->protocol != PROT_TCP) {
+        return NOT_PROXY_PACKET;
+    }
+
+    switch (state->hook) {
+    case NF_INET_PRE_ROUTING:
+        switch (packet->direction) {
+        case DIRECTION_OUT:
+            reroute_client_to_server_packet(packet, skb);
+            return CONTINUE;
+        case DIRECTION_IN:
+            if (is_server_to_proxy_response(packet, skb)) {
+                return ACCEPT_IMMEDIATELY;
+            }
+            // This case might handle packets designated to the firewall host,
+            // and according to the guidelines we can ignore them.
+            return CONTINUE;
+        case DIRECTION_ANY:
+            return DROP_IMMEDIATELY;
+        }
+    case NF_INET_LOCAL_OUT:
+        switch (packet->direction) {
+        case DIRECTION_OUT:
+            if (is_proxy_to_server_request(packet, skb)) {
+                return ACCEPT_IMMEDIATELY;
+            }
+            printk(KERN_DEBUG
+                   "Dropping packet that wasn't sent by the proxy\n");
+            return DROP_IMMEDIATELY;
+        case DIRECTION_IN:
+            reroute_proxy_to_client_packet(packet, skb);
+            if (packet->src_ip == 0 && packet->src_port) {
+                printk("Dropping packet with unknown source\n");
+                return DROP_IMMEDIATELY;
+            }
+            return CONTINUE;
+        case DIRECTION_ANY:
+            return DROP_IMMEDIATELY;
+        }
+    }
+    return CONTINUE; // This line is never reached
+}
+
 void reroute_client_to_server_packet(packet_t *packet, struct sk_buff *skb) {
     if (packet->dst_port == HTTP_PORT_BE) {
         packet->tcp_header->dest = HTTP_PROXY_PORT_BE;

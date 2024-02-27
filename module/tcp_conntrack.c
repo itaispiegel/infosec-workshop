@@ -82,13 +82,18 @@ static inline void close_connection(struct tcp_connection_node *conn) {
 
 static void tcp_fsm_step(struct tcp_connection *conn, direction_t direction,
                          struct tcphdr *tcp_header) {
+    if (tcp_header->rst) {
+        printk(KERN_DEBUG "RST packet\n");
+        conn->state = TCP_CLOSE;
+        return;
+    }
     if (direction == DIRECTION_IN) {
         switch (conn->state) {
         case TCP_CLOSE:
-            // Originally this is TCP_LISTEN, but we don't handle this state,
-            // since the firewall runs in the middle
             if (tcp_header->syn) {
-                conn->state = TCP_SYN_RECV;
+                conn->state =
+                    TCP_SYN_RECV; // Originally transitions to TCP_LISTEN, but
+                                  // we don't handle this state.
                 return;
             }
             break;
@@ -116,7 +121,7 @@ static void tcp_fsm_step(struct tcp_connection *conn, direction_t direction,
             break;
         case TCP_FIN_WAIT1:
             if (tcp_header->fin && tcp_header->ack) {
-                conn->state = TCP_CLOSE; // Originally this goes to TIME_WAIT,
+                conn->state = TCP_CLOSE; // Originally transition to TIME_WAIT,
                                          // but we don't handle this state
                 return;
             }
@@ -131,14 +136,14 @@ static void tcp_fsm_step(struct tcp_connection *conn, direction_t direction,
             break;
         case TCP_FIN_WAIT2:
             if (tcp_header->fin) {
-                conn->state = TCP_CLOSE; // Originally this goes to TIME_WAIT,
+                conn->state = TCP_CLOSE; // Originally transitions to TIME_WAIT,
                                          // but we don't handle this state
                 return;
             }
             break;
         case TCP_CLOSING:
             if (tcp_header->ack) {
-                conn->state = TCP_CLOSE; // Originally this goes to TIME_WAIT,
+                conn->state = TCP_CLOSE; // Originally transitions to TIME_WAIT,
                                          // but we don't handle this state
                 return;
             }
