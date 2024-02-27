@@ -11,10 +11,6 @@
 #include "tcp_conntrack.h"
 #include "types.h"
 
-#define PORT_ANY (0)
-#define PORT_ABOVE_1023 (1023)
-#define PORT_ABOVE_1023_BE (be16_to_cpu(PORT_ABOVE_1023))
-
 extern struct list_head logs_list;
 extern size_t logs_count;
 
@@ -37,51 +33,6 @@ static const struct nf_hook_ops nf_local_out_op = {
     .hooknum = NF_INET_LOCAL_OUT,
     .priority = NF_IP_PRI_FIRST,
 };
-
-static inline bool match_direction(rule_t *rule, packet_t *packet) {
-    return rule->direction == DIRECTION_ANY ||
-           rule->direction == packet->direction;
-}
-
-static inline bool match_rule_ports(__be16 rule_port, __be16 skb_port) {
-    // The port numbers are in big endian, so we need to convert them to host
-    // byte order.
-    // Notice that we assume non UDP and non TCP packets have 0 as their ports.
-    return (rule_port == PORT_ANY || rule_port == skb_port ||
-            (rule_port == PORT_ABOVE_1023_BE && be16_to_cpu(skb_port) > 1023));
-}
-
-static inline bool match_ip_addrs(rule_t *rule, packet_t *packet) {
-    return (rule->src_ip == 0 ||
-            (rule->src_prefix_size != 0 &&
-             (rule->src_ip & rule->src_prefix_mask) ==
-                 (packet->src_ip & rule->src_prefix_mask))) &&
-           (rule->dst_ip == 0 ||
-            (rule->dst_prefix_size != 0 &&
-             (rule->dst_ip & rule->dst_prefix_mask) ==
-                 (packet->dst_ip & rule->dst_prefix_mask)));
-}
-
-static inline bool match_ports(rule_t *rule, packet_t *packet) {
-    return match_rule_ports(rule->src_port, packet->src_port) &&
-           match_rule_ports(rule->dst_port, packet->dst_port);
-}
-
-static inline bool match_protocol(rule_t *rule, packet_t *packet) {
-    return rule->protocol == PROT_ANY || rule->protocol == packet->protocol;
-}
-
-static inline bool match_ack(rule_t *rule, packet_t *packet) {
-    return rule->ack == ACK_ANY || (packet->protocol == PROT_TCP &&
-                                    ((rule->ack == ACK_YES && packet->ack) ||
-                                     (rule->ack == ACK_NO && !packet->ack)));
-}
-
-static inline bool match_rule_packet(rule_t *rule, packet_t *packet) {
-    return match_direction(rule, packet) && match_ip_addrs(rule, packet) &&
-           match_ports(rule, packet) && match_protocol(rule, packet) &&
-           match_ack(rule, packet);
-}
 
 static inline bool log_match_rule(log_row_t *log_row, rule_t *rule) {
     return log_row->protocol == rule->protocol &&

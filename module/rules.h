@@ -1,6 +1,7 @@
 #ifndef _RULES_H
 #define _RULES_H
 
+#include "parser.h"
 #include "types.h"
 
 #define MAX_RULES (50)
@@ -34,6 +35,14 @@ typedef struct {
 
 extern rule_t rules[MAX_RULES];
 extern __u8 rules_count;
+
+/**
+ * Match the given rule with the given packet.
+ * @param rule The rule to match.
+ * @param packet The packet to match.
+ * @return True if the rule matches the packet, false otherwise.
+ */
+inline bool match_rule_packet(rule_t *rule, packet_t *packet);
 
 /**
  * Initialize the rules table device.
