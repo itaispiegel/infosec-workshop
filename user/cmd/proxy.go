@@ -5,7 +5,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const defaultAddress = "127.0.0.1"
+const defaultAddress = "10.1.1.3"
 
 var addr string
 var httpPort, ftpPort uint16
