@@ -66,13 +66,22 @@ func allowFtpDataConnection(data []byte, dest net.Conn, logger zerolog.Logger) b
 			ipToFtpRepresentation(proxyIpAddr),
 			clientDataAddr.Port/256, clientDataAddr.Port%256,
 		)
-		dest.Write([]byte(payloadToServer))
+		if _, err := dest.Write([]byte(payloadToServer)); err != nil {
+			log.Error().Err(err).
+				Str("clientAddr", clientDataAddr.String()).
+				Str("serverAddr", serverDataAddr.String()).
+				Msg("Error sending FTP data connection payload to server, blocking connection")
+			return false
+		}
 		log.Info().
 			Str("bindAddr", clientDataAddr.String()).
 			Str("serverAddr", serverDataAddr.String()).
 			Msg("Successfully allowed new FTP data connection")
 	} else {
-		dest.Write(data)
+		if _, err := dest.Write(data); err != nil {
+			logger.Error().Err(err).Msg("Error forwarding data")
+			return false
+		}
 	}
 	return true
 }
