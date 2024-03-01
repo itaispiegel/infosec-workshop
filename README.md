@@ -42,3 +42,34 @@ The supported commands are:
 
 I chose to implement the userspace program in Go.
 To setup Go in your environment, follow the installation instructions [here](https://go.dev/doc/install).
+
+## HW4
+### Stateful Connection Tracking
+In this exercise, we extended the functionality of our firewall from the previous exercise to incorporate stateful features.
+Now, it encompasses a TCP connections table, enabling it to track the state of each connection upon its establishment.
+The states utilized in our firewall align with those typically employed in TCP, with transitions defined by the [TCP Finite State Machine](http://tcpipguide.com/free/t_TCPOperationalOverviewandtheTCPFiniteStateMachineF-2.htm).
+Upon the arrival of a TCP SYN packet, the firewall compares it with the rules, and if a matching rule is found, and its verdict is accept, the connection is added to the table.
+Otherwise, the firewall checks if the packet is part of an established session, and the verdict is decided accordingly.
+The table is implemented with the kernel's hash table API, where the hash is calculated by the client and server addresses 4-tuple.
+
+### Application Level Gateway
+Additionally, we implemented an application level gateway, operating as a userspace program acting as a proxy.
+We implemented two modules for it: an HTTP proxy, and an FTP proxy, running on ports 800 and 210 respectively.
+When the firewall intercepts a packet destined for port 80 or 21, it forwards it to the corresponding module.
+The proxy has an open session with the client, and initiates a new session with the server, thereby facilitating seamless data forwarding while enabling real-time inspection and manipulation of the data for enhanced client experience.
+
+### HTTP Proxy
+The HTTP proxy inspects the payload, looks at the `Content-Type` HTTP header, and blocks CSV and ZIP files.
+In this case, it'll respond to the client that the content is blocked.
+
+### FTP Proxy
+FTP encompasses two operational modes: active and passive.
+The classic vsftpd implementation in Linux, defaults to the active mode.
+The purpose of the FTP proxy, is to facilitate the operation of this mode through the firewall.
+In the active mode, the client connects to the server at port 21, and then sends it a PORT packet of the format: `PORT 10,1,1,1,57,83`.
+In this packet the client announces that he'll be expecting the server to connect to the IP address `10.1.1.1` at port $57 * 256 + 83 = 14675$.
+The server then connects to this endpoint, from the constant port 20.
+This protocol poses challenges for NATs and Firewalls.
+Fortunately, our application level gateway enables inspecction of PORT packets, allowing seamless passage of FTP data connections.
+Upon establishment of such connections, the proxy writes the addresses to the file `/sys/class/fw/conn/related_conns`, and the kernel module adds the new connection to the table.
+The new connection is considered a "related" session, as evidenced in the logs.
