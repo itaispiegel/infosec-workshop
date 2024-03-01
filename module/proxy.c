@@ -16,13 +16,6 @@ static void fix_checksum(struct sk_buff *skb, struct iphdr *ip_header,
     ip_header->check = 0;
     ip_header->check = ip_fast_csum((u8 *)ip_header, ip_header->ihl);
     skb->ip_summed = CHECKSUM_NONE;
-
-    // Fix packet linearization
-    // skb->csum_valid = 0;
-    // if (skb_linearize(skb) < 0)
-    // {
-    //     /* Handle error
-    // }
 }
 
 enum proxy_response handle_proxy_packet(packet_t *packet, struct sk_buff *skb,
