@@ -92,7 +92,7 @@ static void *add_connection(struct socket_address saddr,
     }
 
     conn_node->conn = (struct tcp_connection){
-        .state = TCP_CLOSE,
+        .state = state,
         .saddr = saddr,
         .daddr = daddr,
     };
@@ -143,7 +143,7 @@ static void connections_gc(struct timer_list *timer) {
     unsigned i;
     struct tcp_connection_node *conn_node;
     hash_for_each(tcp_connections, i, conn_node, node) {
-        if (conn_node->conn.state == TCP_CLOSE) {
+        if (conn_node->conn.state == TCP_TIME_WAIT) {
             printk(
                 KERN_DEBUG "Removing closed connection from table "
                            "%pI4:%u-->%pI4:%u\n",
@@ -155,10 +155,11 @@ static void connections_gc(struct timer_list *timer) {
     mod_timer(&gc_timer, jiffies + msecs_to_jiffies(GC_INTERVAL_MS));
 }
 
-static void tcp_fsm_step(struct tcp_connection *conn, direction_t direction,
-                         struct tcphdr *tcp_header) {
+static void tcp_fsm_step(struct tcp_connection_node *conn_node,
+                         direction_t direction, struct tcphdr *tcp_header) {
+    struct tcp_connection *conn = &conn_node->conn;
     if (tcp_header->rst) {
-        conn->state = TCP_CLOSE;
+        close_connection(conn_node);
         return;
     }
     if (direction == DIRECTION_IN) {
@@ -202,8 +203,7 @@ static void tcp_fsm_step(struct tcp_connection *conn, direction_t direction,
             break;
         case TCP_FIN_WAIT1:
             if (tcp_header->fin && tcp_header->ack) {
-                conn->state = TCP_CLOSE; // Originally transition to TIME_WAIT,
-                                         // but we don't handle this state
+                conn->state = TCP_TIME_WAIT;
                 return;
             }
             if (tcp_header->ack) {
@@ -217,21 +217,19 @@ static void tcp_fsm_step(struct tcp_connection *conn, direction_t direction,
             break;
         case TCP_FIN_WAIT2:
             if (tcp_header->fin) {
-                conn->state = TCP_CLOSE; // Originally transitions to TIME_WAIT,
-                                         // but we don't handle this state
+                conn->state = TCP_TIME_WAIT;
                 return;
             }
             break;
         case TCP_CLOSING:
             if (tcp_header->ack) {
-                conn->state = TCP_CLOSE; // Originally transitions to TIME_WAIT,
-                                         // but we don't handle this state
+                conn->state = TCP_TIME_WAIT;
                 return;
             }
             break;
         case TCP_LAST_ACK:
             if (tcp_header->ack) {
-                conn->state = TCP_CLOSE;
+                close_connection(conn_node);
                 return;
             }
             break;
@@ -276,14 +274,7 @@ static inline bool update_connection_state(struct tcphdr *tcp_header,
     if (conn_node == NULL) {
         return false;
     }
-    tcp_fsm_step(&conn_node->conn, direction, tcp_header);
-    // if (conn_node->conn.state == TCP_CLOSE) {
-    //     printk(KERN_DEBUG "Removing closed connection from table "
-    //                       "%pI4:%u-->%pI4:%u\n",
-    //            &saddr.addr, ntohs(saddr.port), &daddr.addr,
-    //            ntohs(daddr.port));
-    //     close_connection(conn_node);
-    // }
+    tcp_fsm_step(conn_node, direction, tcp_header);
     return true;
 }
 
@@ -345,7 +336,7 @@ void track_one_sided_connection(packet_t *packet, direction_t direction) {
         if ((conn = add_connection(saddr, daddr, TCP_CLOSE)) == NULL) {
             return;
         }
-        tcp_fsm_step(&conn->conn, direction, packet->tcp_header);
+        tcp_fsm_step(conn, direction, packet->tcp_header);
     }
 }
 
