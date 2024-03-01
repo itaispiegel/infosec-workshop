@@ -75,6 +75,22 @@ static inline log_row_t new_log_row_by_packet(packet_t *packet, reason_t reason,
     };
 }
 
+static inline void *new_log_entry(packet_t *packet, reason_t reason,
+                                  __u8 verdict) {
+    struct log_entry *log_entry;
+    printk(KERN_INFO "Creating a new log entry for packet\n");
+    if ((log_entry = kmalloc(sizeof(struct log_entry), GFP_KERNEL)) == NULL) {
+        printk(KERN_WARNING
+               "Failed to allocate memory for log entry, so ignoring it\n");
+        return log_entry;
+    }
+
+    log_entry->log_row = new_log_row_by_packet(packet, reason, verdict);
+    list_add_tail(&log_entry->list, &logs_list);
+    logs_count++;
+    return log_entry;
+}
+
 static bool log_entry_matches_packet(struct log_entry *log_entry,
                                      packet_t *packet, direction_t direction) {
     if (direction == DIRECTION_OUT) {
@@ -109,17 +125,8 @@ void update_log_entry_by_packet(packet_t *packet, reason_t reason,
         }
     }
 
-    printk(KERN_INFO "Creating a new log entry for packet\n");
-    log_entry = kmalloc(sizeof(struct log_entry), GFP_KERNEL);
-    if (log_entry == NULL) {
-        printk(KERN_WARNING
-               "Failed to allocate memory for log entry, so ignoring it\n");
-        return;
-    }
-
-    log_entry->log_row = new_log_row_by_packet(packet, reason, verdict);
-    list_add_tail(&log_entry->list, &logs_list);
-    logs_count++;
+    log_entry = new_log_entry(packet, reason, verdict);
+    return;
 }
 
 void update_established_tcp_conn_log(packet_t *packet) {
@@ -133,6 +140,11 @@ void update_established_tcp_conn_log(packet_t *packet) {
             return;
         }
     }
+
+    log_entry = new_log_entry(
+        packet, REASON_RELATED_CONNECTION,
+        NF_ACCEPT); // In this case the connection is guaranteed to be related.
+    return;
 }
 
 ssize_t show_logs_dev_read(struct file *filp, char __user *buf, size_t len,
