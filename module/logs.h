@@ -20,6 +20,7 @@ typedef enum {
     REASON_NO_MATCHING_RULE = -2,
     REASON_XMAS_PACKET = -4,
     REASON_ILLEGAL_VALUE = -6,
+    REASON_RELATED_CONNECTION = -8,
 } __attribute__((packed)) reason_t;
 
 typedef struct {
@@ -56,8 +57,10 @@ void update_log_entry_by_packet(packet_t *packet, reason_t reason,
  * Updates the log for TCP packets with ACK or RST flags.
  * As opposed to @ref update_log_entry_by_packet, this function ignores the
  * direction of the packet.
- * Also, we don't create new log rows here, since we assume that the connection
- * is already established - so we already have a log row for it.
+ * Specifically related connections might have a connection entry in the table,
+ * but not a log. In case that we don't find a log entry, we assume the given
+ * packet is related to an established connection, so we create a log entry for
+ * it with the reason REASON_RELATED_CONNECTION and with the verdict accept.
  * @param packet The packet to match.
  */
 void update_established_tcp_conn_log(packet_t *packet);
