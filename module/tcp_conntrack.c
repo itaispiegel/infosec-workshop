@@ -10,15 +10,8 @@
 
 static DECLARE_HASHTABLE(tcp_connections, 8);
 
-// TODO: Unite the devices under a joined hierarchy
 static int conns_dev_major;
 static struct device *conns_dev;
-
-static int proxy_port_dev_major;
-static struct device *proxy_port_dev;
-
-static int related_conns_dev_major;
-static struct device *related_conns_dev;
 
 static struct file_operations fops = {
     .owner = THIS_MODULE,
@@ -139,13 +132,21 @@ static inline void close_connection(struct tcp_connection_node *conn) {
     kfree(conn);
 }
 
+/**
+ * A callback function for deleting closed connections from the table.
+ * Each connection stays in TIME_WAIT for a period of time, to still be able to
+ * respond to late packets. After this period, the connection is removed from
+ * the table.
+ * Notice that it's possible that the callback is called immediately after a
+ * connection transitions to TIME_WAIT.
+ */
 static void connections_gc(struct timer_list *timer) {
     unsigned i;
     struct tcp_connection_node *conn_node;
     hash_for_each(tcp_connections, i, conn_node, node) {
         if (conn_node->conn.state == TCP_TIME_WAIT) {
             printk(
-                KERN_DEBUG "Removing closed connection from table "
+                KERN_DEBUG "Removing TIME_WAIT connection from table "
                            "%pI4:%u-->%pI4:%u\n",
                 &conn_node->conn.saddr.addr, ntohs(conn_node->conn.saddr.port),
                 &conn_node->conn.daddr.addr, ntohs(conn_node->conn.daddr.port));
@@ -362,8 +363,8 @@ bool match_connection_and_update_state(packet_t packet) {
 int init_tcp_conntrack(struct class *fw_sysfs_class) {
     hash_init(tcp_connections);
 
-    conns_dev_major = register_chrdev(0, DEVICE_NAME_CONNTRACK, &fops);
-    if (conns_dev_major < 0) {
+    if ((conns_dev_major = register_chrdev(0, DEVICE_NAME_CONNTRACK, &fops)) <
+        0) {
         return conns_dev_major;
     }
 
@@ -378,41 +379,16 @@ int init_tcp_conntrack(struct class *fw_sysfs_class) {
         goto destroy_conns_dev;
     }
 
-    proxy_port_dev_major = register_chrdev(0, DEVICE_NAME_PROXY_PORT, &fops);
-    if (proxy_port_dev_major < 0) {
-        goto remove_conns_dev_file;
-    }
-
-    proxy_port_dev =
-        device_create(fw_sysfs_class, NULL, MKDEV(proxy_port_dev_major, 0),
-                      NULL, DEVICE_NAME_PROXY_PORT);
-    if (IS_ERR(proxy_port_dev)) {
-        goto ungregister_proxy_port_chrdev;
-    }
-
     if (device_create_file(
-            proxy_port_dev,
+            conns_dev,
             (const struct device_attribute *)&dev_attr_proxy_port.attr)) {
-        goto destroy_proxy_port_dev;
-    }
-
-    related_conns_dev_major =
-        register_chrdev(0, DEVICE_NAME_RELATED_CONNS, &fops);
-    if (related_conns_dev_major < 0) {
-        goto remove_proxy_port_file;
-    }
-
-    related_conns_dev =
-        device_create(fw_sysfs_class, NULL, MKDEV(related_conns_dev_major, 0),
-                      NULL, DEVICE_NAME_RELATED_CONNS);
-    if (IS_ERR(related_conns_dev)) {
-        goto unregister_related_conns_dev;
+        goto remove_conns_file;
     }
 
     if (device_create_file(
-            related_conns_dev,
+            conns_dev,
             (const struct device_attribute *)&dev_attr_related_conns.attr)) {
-        goto destroy_related_conns_dev;
+        goto remove_proxy_port_file;
     }
 
     timer_setup(&gc_timer, connections_gc, 0);
@@ -420,19 +396,10 @@ int init_tcp_conntrack(struct class *fw_sysfs_class) {
 
     return 0;
 
-destroy_related_conns_dev:
-    device_destroy(fw_sysfs_class, MKDEV(related_conns_dev_major, 0));
-unregister_related_conns_dev:
-    unregister_chrdev(related_conns_dev_major, DEVICE_NAME_RELATED_CONNS);
 remove_proxy_port_file:
     device_remove_file(
-        proxy_port_dev,
-        (const struct device_attribute *)&dev_attr_proxy_port.attr);
-destroy_proxy_port_dev:
-    device_destroy(fw_sysfs_class, MKDEV(proxy_port_dev_major, 0));
-ungregister_proxy_port_chrdev:
-    unregister_chrdev(conns_dev_major, DEVICE_NAME_PROXY_PORT);
-remove_conns_dev_file:
+        conns_dev, (const struct device_attribute *)&dev_attr_proxy_port.attr);
+remove_conns_file:
     device_remove_file(conns_dev,
                        (const struct device_attribute *)&dev_attr_conns.attr);
 destroy_conns_dev:
@@ -447,19 +414,14 @@ void destroy_tcp_conntrack(struct class *fw_sysfs_class) {
     struct tcp_connection_node *cur;
 
     device_remove_file(
-        related_conns_dev,
-        (const struct device_attribute *)&dev_attr_proxy_port.attr);
-    device_destroy(fw_sysfs_class, MKDEV(related_conns_dev_major, 0));
-    unregister_chrdev(related_conns_dev_major, DEVICE_NAME_RELATED_CONNS);
+        conns_dev, (const struct device_attribute *)&dev_attr_proxy_port.attr);
 
     device_remove_file(
-        proxy_port_dev,
-        (const struct device_attribute *)&dev_attr_proxy_port.attr);
-    device_destroy(fw_sysfs_class, MKDEV(proxy_port_dev_major, 0));
-    unregister_chrdev(proxy_port_dev_major, DEVICE_NAME_PROXY_PORT);
+        conns_dev, (const struct device_attribute *)&dev_attr_proxy_port.attr);
 
     device_remove_file(conns_dev,
                        (const struct device_attribute *)&dev_attr_conns.attr);
+
     device_destroy(fw_sysfs_class, MKDEV(conns_dev_major, 0));
     unregister_chrdev(conns_dev_major, DEVICE_NAME_CONNTRACK);
 

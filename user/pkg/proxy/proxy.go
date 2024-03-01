@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	setProxyPortFile = "/sys/class/fw/proxy_port/proxy_port"
+	setProxyPortFile = "/sys/class/fw/conn/proxy_port"
 )
 
 // PacketCallback is a function that is called when data is received.
