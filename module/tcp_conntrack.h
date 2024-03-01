@@ -79,6 +79,7 @@ void track_one_sided_connection(packet_t *packet, direction_t direction);
 
 /**
  * Persists two connections in the hash table: src --> dest and dest --> src.
+ * @param packet The packet to extract the sessions from.
  */
 void track_two_sided_connection(packet_t *packet);
 
