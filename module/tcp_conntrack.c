@@ -81,11 +81,31 @@ static ssize_t proxy_port_store(struct device *dev,
     return expected_count;
 }
 
+static void *add_connection(struct socket_address saddr,
+                            struct socket_address daddr, __u8 state) {
+    __u32 hash;
+    struct tcp_connection_node *conn_node;
+    if (!(conn_node =
+              kmalloc(sizeof(struct tcp_connection_node), GFP_KERNEL))) {
+        printk(KERN_ERR "Failed to allocate memory for connection\n");
+        return conn_node;
+    }
+
+    conn_node->conn = (struct tcp_connection){
+        .state = TCP_CLOSE,
+        .saddr = saddr,
+        .daddr = daddr,
+    };
+    hash = hash_conn_addrs(saddr, daddr);
+    hash_add(tcp_connections, &conn_node->node, hash);
+    printk(KERN_DEBUG "Tracking new TCP connection %pI4:%u-->%pI4:%u\n",
+           &saddr.addr, ntohs(saddr.port), &daddr.addr, ntohs(daddr.port));
+    return conn_node;
+}
+
 static ssize_t related_conns_store(struct device *dev,
                                    struct device_attribute *attr,
                                    const char *buf, size_t count) {
-    __u32 hash;
-    struct tcp_connection_node *conn_node;
     struct socket_address saddr;
     struct socket_address daddr;
 
@@ -99,38 +119,13 @@ static ssize_t related_conns_store(struct device *dev,
     memcpy(&daddr, buf + sizeof(struct socket_address),
            sizeof(struct socket_address));
 
-    // TODO: Extract a function for adding a new connection.
-    conn_node = kmalloc(sizeof(struct tcp_connection_node), GFP_KERNEL);
-    if (!conn_node) {
-        printk(KERN_ERR "Failed to allocate memory for connection\n");
-        return ENOMEM;
+    if (add_connection(saddr, daddr, TCP_CLOSE) == NULL) {
+        return -ENOMEM;
     }
 
-    conn_node->conn = (struct tcp_connection){
-        .state = TCP_CLOSE,
-        .saddr = saddr,
-        .daddr = daddr,
-    };
-    hash = hash_conn_addrs(saddr, daddr);
-    hash_add(tcp_connections, &conn_node->node, hash);
-    printk(KERN_DEBUG "Tracking new TCP connection %pI4:%u-->%pI4:%u\n",
-           &saddr.addr, ntohs(saddr.port), &daddr.addr, ntohs(daddr.port));
-
-    conn_node = kmalloc(sizeof(struct tcp_connection_node), GFP_KERNEL);
-    if (!conn_node) {
-        printk(KERN_ERR "Failed to allocate memory for connection\n");
-        return ENOMEM;
+    if (add_connection(daddr, saddr, TCP_LISTEN) == NULL) {
+        return -ENOMEM;
     }
-
-    conn_node->conn = (struct tcp_connection){
-        .state = TCP_LISTEN,
-        .saddr = daddr,
-        .daddr = saddr,
-    };
-    hash = hash_conn_addrs(daddr, saddr);
-    hash_add(tcp_connections, &conn_node->node, hash);
-    printk(KERN_DEBUG "Tracking new TCP connection %pI4:%u-->%pI4:%u\n",
-           &daddr.addr, ntohs(daddr.port), &saddr.addr, ntohs(saddr.port));
 
     return expected_count;
 }
@@ -333,7 +328,6 @@ lookup_server_address_by_client_address(struct socket_address client_addr) {
 void track_one_sided_connection(packet_t *packet, direction_t direction) {
     struct tcp_connection_node *conn;
     struct socket_address saddr, daddr;
-    __u32 hash;
 
     if (direction == DIRECTION_OUT) {
         saddr.addr = packet->src_ip;
@@ -348,22 +342,10 @@ void track_one_sided_connection(packet_t *packet, direction_t direction) {
     }
 
     if ((conn = lookup_tcp_connection_node(saddr, daddr)) == NULL) {
-        conn = kmalloc(sizeof(struct tcp_connection_node), GFP_KERNEL);
-        if (!conn) {
-            printk(KERN_ERR "Failed to allocate memory for connection\n");
+        if ((conn = add_connection(saddr, daddr, TCP_CLOSE)) == NULL) {
             return;
         }
-
-        conn->conn = (struct tcp_connection){
-            .state = TCP_CLOSE,
-            .saddr = saddr,
-            .daddr = daddr,
-        };
-        hash = hash_conn_addrs(saddr, daddr);
         tcp_fsm_step(&conn->conn, direction, packet->tcp_header);
-        hash_add(tcp_connections, &conn->node, hash);
-        printk(KERN_DEBUG "Tracking new TCP connection %pI4:%u-->%pI4:%u\n",
-               &saddr.addr, ntohs(saddr.port), &daddr.addr, ntohs(daddr.port));
     }
 }
 
