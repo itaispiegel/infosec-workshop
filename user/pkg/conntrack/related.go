@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	relatedConnsFile = "/sys/class/fw/related_conns/related_conns"
+	relatedConnsFile = "/sys/class/fw/conn/related_conns"
 )
 
 func AllowRelatedConnection(conn *Connection) error {
