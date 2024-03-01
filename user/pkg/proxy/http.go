@@ -15,7 +15,7 @@ var dangerousContentTypes = []string{
 	"application/zip",
 }
 
-func sendBlockedResponse(dest net.Conn) {
+func sendBlockedResponse(dest net.Conn) error {
 	resp := http.Response{
 		Status:     "403 Forbidden",
 		StatusCode: 403,
@@ -27,7 +27,7 @@ func sendBlockedResponse(dest net.Conn) {
 		Body: io.NopCloser(strings.NewReader("Blocked by Firewall\n")),
 	}
 
-	resp.Write(dest)
+	return resp.Write(dest)
 }
 
 func blockDangerousFilesCallback(data []byte, dest net.Conn, logger zerolog.Logger) bool {
@@ -36,7 +36,11 @@ func blockDangerousFilesCallback(data []byte, dest net.Conn, logger zerolog.Logg
 		contentType := string(matches[1])
 		for i := range dangerousContentTypes {
 			if contentType == dangerousContentTypes[i] {
-				sendBlockedResponse(dest)
+				if err := sendBlockedResponse(dest); err != nil {
+					logger.Error().Err(err).Msg("Error sending blocked response")
+					return false
+				}
+
 				logger.Warn().Str("srcAddr", dest.LocalAddr().String()).
 					Str("destAddr", dest.RemoteAddr().String()).
 					Msg("Blocked CSV file")
@@ -44,7 +48,10 @@ func blockDangerousFilesCallback(data []byte, dest net.Conn, logger zerolog.Logg
 			}
 		}
 	}
-	dest.Write(data)
+	if _, err := dest.Write(data); err != nil {
+		logger.Error().Err(err).Msg("Error forwarding data")
+		return false
+	}
 	return true
 }
 
