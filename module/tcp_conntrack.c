@@ -3,7 +3,10 @@
 #include <linux/device.h>
 #include <linux/fs.h>
 #include <linux/jhash.h>
+#include <linux/timer.h>
 #include <net/netfilter/nf_conntrack_tuple.h>
+
+#define GC_INTERVAL_MS 5000
 
 static DECLARE_HASHTABLE(tcp_connections, 8);
 
@@ -20,6 +23,8 @@ static struct device *related_conns_dev;
 static struct file_operations fops = {
     .owner = THIS_MODULE,
 };
+
+static struct timer_list gc_timer;
 
 static inline bool match_conn_addrs(struct tcp_connection *conn,
                                     struct socket_address *saddr,
@@ -139,10 +144,25 @@ static inline void close_connection(struct tcp_connection_node *conn) {
     kfree(conn);
 }
 
+static void connections_gc(struct timer_list *timer) {
+    unsigned i;
+    struct tcp_connection_node *conn_node;
+    hash_for_each(tcp_connections, i, conn_node, node) {
+        if (conn_node->conn.state == TCP_CLOSE) {
+            printk(
+                KERN_DEBUG "Removing closed connection from table "
+                           "%pI4:%u-->%pI4:%u\n",
+                &conn_node->conn.saddr.addr, ntohs(conn_node->conn.saddr.port),
+                &conn_node->conn.daddr.addr, ntohs(conn_node->conn.daddr.port));
+            close_connection(conn_node);
+        }
+    }
+    mod_timer(&gc_timer, jiffies + msecs_to_jiffies(GC_INTERVAL_MS));
+}
+
 static void tcp_fsm_step(struct tcp_connection *conn, direction_t direction,
                          struct tcphdr *tcp_header) {
     if (tcp_header->rst) {
-        printk(KERN_DEBUG "RST packet\n");
         conn->state = TCP_CLOSE;
         return;
     }
@@ -262,12 +282,13 @@ static inline bool update_connection_state(struct tcphdr *tcp_header,
         return false;
     }
     tcp_fsm_step(&conn_node->conn, direction, tcp_header);
-    if (conn_node->conn.state == TCP_CLOSE) {
-        printk(KERN_DEBUG "Removing closed connection from table "
-                          "%pI4:%u-->%pI4:%u\n",
-               &saddr.addr, ntohs(saddr.port), &daddr.addr, ntohs(daddr.port));
-        close_connection(conn_node);
-    }
+    // if (conn_node->conn.state == TCP_CLOSE) {
+    //     printk(KERN_DEBUG "Removing closed connection from table "
+    //                       "%pI4:%u-->%pI4:%u\n",
+    //            &saddr.addr, ntohs(saddr.port), &daddr.addr,
+    //            ntohs(daddr.port));
+    //     close_connection(conn_node);
+    // }
     return true;
 }
 
@@ -421,6 +442,9 @@ int init_tcp_conntrack(struct class *fw_sysfs_class) {
         goto destroy_related_conns_dev;
     }
 
+    timer_setup(&gc_timer, connections_gc, 0);
+    mod_timer(&gc_timer, jiffies + msecs_to_jiffies(GC_INTERVAL_MS));
+
     return 0;
 
 destroy_related_conns_dev:
@@ -466,5 +490,6 @@ void destroy_tcp_conntrack(struct class *fw_sysfs_class) {
     device_destroy(fw_sysfs_class, MKDEV(conns_dev_major, 0));
     unregister_chrdev(conns_dev_major, DEVICE_NAME_CONNTRACK);
 
+    del_timer(&gc_timer);
     hash_for_each(tcp_connections, i, cur, node) { close_connection(cur); }
 }
