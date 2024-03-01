@@ -28,6 +28,13 @@ static const struct nf_hook_ops nf_local_out_op = {
     .priority = NF_IP_PRI_FIRST,
 };
 
+static const struct nf_hook_ops nf_postrouting_op = {
+    .hook = netfilter_hook_func,
+    .pf = NFPROTO_IPV4,
+    .hooknum = NF_INET_POST_ROUTING,
+    .priority = NF_IP_PRI_FIRST,
+};
+
 static unsigned int netfilter_hook_func(void *priv, struct sk_buff *skb,
                                         const struct nf_hook_state *state) {
     __u8 verdict;
@@ -63,11 +70,12 @@ static unsigned int netfilter_hook_func(void *priv, struct sk_buff *skb,
         return NF_DROP;
     }
 
-    if (packet.protocol == PROT_TCP && (packet.ack || packet.tcp_header->rst)) {
-        matched = match_connection_and_update_state(packet);
-        verdict = matched ? NF_ACCEPT : NF_DROP;
-        update_established_tcp_conn_log(&packet);
-        return verdict;
+    if (packet.protocol == PROT_TCP) {
+        if ((matched = match_connection_and_update_state(packet))) {
+            update_established_tcp_conn_log(&packet);
+            verdict = matched ? NF_ACCEPT : NF_DROP;
+            return verdict;
+        }
     }
 
     if ((matching_rule = lookup_matching_rule(&packet)).rule == NULL) {
@@ -89,13 +97,22 @@ int init_netfilter_hook(void) {
         return res;
     }
     if ((res = nf_register_net_hook(&init_net, &nf_local_out_op)) != 0) {
-        nf_unregister_net_hook(&init_net, &nf_prerouting_op);
-        return res;
+        goto destroy_prerouting_op;
     }
+    if ((res = nf_register_net_hook(&init_net, &nf_postrouting_op)) != 0) {
+        goto destroy_local_out_op;
+    }
+    return res;
+destroy_local_out_op:
+    nf_unregister_net_hook(&init_net, &nf_prerouting_op);
+    return res;
+destroy_prerouting_op:
+    nf_unregister_net_hook(&init_net, &nf_prerouting_op);
     return res;
 }
 
 void destroy_netfilter_hook(void) {
+    nf_unregister_net_hook(&init_net, &nf_postrouting_op);
     nf_unregister_net_hook(&init_net, &nf_local_out_op);
     nf_unregister_net_hook(&init_net, &nf_prerouting_op);
 }

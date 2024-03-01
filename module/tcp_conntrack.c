@@ -94,7 +94,7 @@ static ssize_t related_conns_store(struct device *dev,
     memcpy(&daddr, buf + sizeof(struct socket_address),
            sizeof(struct socket_address));
 
-    // TODO: Extract a function for adding a new connection.x
+    // TODO: Extract a function for adding a new connection.
     conn_node = kmalloc(sizeof(struct tcp_connection_node), GFP_KERNEL);
     if (!conn_node) {
         printk(KERN_ERR "Failed to allocate memory for connection\n");
@@ -153,6 +153,13 @@ static void tcp_fsm_step(struct tcp_connection *conn, direction_t direction,
                 conn->state =
                     TCP_SYN_RECV; // Originally transitions to TCP_LISTEN, but
                                   // we don't handle this state.
+                return;
+            }
+            break;
+        case TCP_LISTEN:
+            if (tcp_header->syn) {
+                conn->state =
+                    TCP_SYN_RECV; // Related connections start in this state.
                 return;
             }
             break;
@@ -258,7 +265,7 @@ static inline bool update_connection_state(struct tcphdr *tcp_header,
     if (conn_node->conn.state == TCP_CLOSE) {
         printk(KERN_DEBUG "Removing closed connection from table "
                           "%pI4:%u-->%pI4:%u\n",
-               &saddr.addr, saddr.port, &daddr.addr, daddr.port);
+               &saddr.addr, ntohs(saddr.port), &daddr.addr, ntohs(daddr.port));
         close_connection(conn_node);
     }
     return true;
