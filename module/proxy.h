@@ -18,12 +18,14 @@
  * The possible responses to a packet that is handled by the proxy.
  * ACCEPT_IMMEDIATELY: The packet is accepted and the connection isn't tracked.
  * DROP_IMMEDIATELY: The packet is dropped and the connection isn't tracked.
- * CONTINUE: The packet isn't handled by the proxy.
+ * HANDLED: The packet is successfully handled by the proxy.
+ * UNHANDLED: The packet is not handled by the proxy.
  */
 enum proxy_response {
     ACCEPT_IMMEDIATELY,
     DROP_IMMEDIATELY,
-    CONTINUE,
+    HANDLED,
+    UNHANDLED
 };
 
 /**

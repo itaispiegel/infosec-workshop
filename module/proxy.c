@@ -28,7 +28,7 @@ static void fix_checksum(struct sk_buff *skb, struct iphdr *ip_header,
 enum proxy_response handle_proxy_packet(packet_t *packet, struct sk_buff *skb,
                                         const struct nf_hook_state *state) {
     if (packet->protocol != PROT_TCP) {
-        return CONTINUE;
+        return UNHANDLED;
     }
 
     switch (state->hook) {
@@ -58,17 +58,12 @@ enum proxy_response handle_proxy_packet(packet_t *packet, struct sk_buff *skb,
                    "Dropping packet that wasn't sent by the proxy\n");
             return DROP_IMMEDIATELY;
         case DIRECTION_IN:
-            reroute_proxy_to_client_packet(packet, skb);
-            if (packet->src_ip == 0 && packet->src_port) {
-                printk("Dropping packet with unknown source\n");
-                return DROP_IMMEDIATELY;
-            }
-            return CONTINUE;
+            return reroute_proxy_to_client_packet(packet, skb);
         case DIRECTION_ANY:
             return DROP_IMMEDIATELY;
         }
     }
-    return CONTINUE; // This line is never reached
+    return UNHANDLED; // This line is never reached
 }
 
 enum proxy_response reroute_client_to_server_packet(packet_t *packet,
@@ -77,12 +72,14 @@ enum proxy_response reroute_client_to_server_packet(packet_t *packet,
         packet->tcp_header->dest = HTTP_PROXY_PORT_BE;
         packet->ip_header->daddr = FW_INTERNAL_PROXY_IP;
         fix_checksum(skb, packet->ip_header, packet->tcp_header);
+        return HANDLED;
     } else if (packet->dst_port == FTP_CONTROL_PORT_BE) {
         packet->tcp_header->dest = FTP_CONTROL_PROXY_PORT_BE;
         packet->ip_header->daddr = FW_INTERNAL_PROXY_IP;
         fix_checksum(skb, packet->ip_header, packet->tcp_header);
+        return HANDLED;
     }
-    return CONTINUE;
+    return UNHANDLED;
 }
 
 enum proxy_response reroute_proxy_to_client_packet(packet_t *packet,
@@ -100,8 +97,9 @@ enum proxy_response reroute_proxy_to_client_packet(packet_t *packet,
         packet->src_ip = packet->ip_header->saddr = server_addr.addr;
         packet->src_port = packet->tcp_header->source = server_addr.port;
         fix_checksum(skb, packet->ip_header, packet->tcp_header);
+        return HANDLED;
     }
-    return CONTINUE;
+    return UNHANDLED;
 }
 
 bool is_server_to_proxy_response(packet_t *packet, struct sk_buff *skb) {
@@ -135,8 +133,9 @@ enum proxy_response reroute_server_to_client_ftp_data(packet_t *packet,
         packet->tcp_header->dest = client_addr.port;
         packet->ip_header->daddr = client_addr.addr;
         fix_checksum(skb, packet->ip_header, packet->tcp_header);
+        return HANDLED;
     }
-    return CONTINUE;
+    return UNHANDLED;
 }
 
 enum proxy_response handle_ftp_data_connection_snat(packet_t *packet,
@@ -145,7 +144,7 @@ enum proxy_response handle_ftp_data_connection_snat(packet_t *packet,
         packet->dst_port == FTP_DATA_PORT_BE) {
         packet->ip_header->saddr = FW_EXTERNAL_PROXY_IP;
         fix_checksum(skb, packet->ip_header, packet->tcp_header);
-        return CONTINUE;
+        return HANDLED;
     }
     return ACCEPT_IMMEDIATELY; // In this case we can safely assume that the
                                // packet was already accepted by the
