@@ -63,6 +63,8 @@ func (p *Proxy) handleConnection(proxyToClientConn net.Conn) {
 		return
 	}
 
+	log.Debug().Str("serverAddr", serverAddr.String()).
+		Msg("Found server address in the connections table")
 	proxyToServerConn, err := connectToServer(clientAddr, serverAddr)
 	if err != nil {
 		log.Error().Err(err).Msg("Error connecting to server")
@@ -141,6 +143,7 @@ func connectToServer(clientAddr *net.TCPAddr, serverAddr *net.TCPAddr) (net.Conn
 	}
 
 	proxyPort := uint16(sockAddrInet4.Port)
+	log.Debug().Uint16("proxyPort", proxyPort).Msg("Set proxy port")
 	setProxyPort(clientAddr, serverAddr, proxyPort)
 
 	serverAddrInet4 := &syscall.SockaddrInet4{Port: serverAddr.Port, Addr: [4]byte(serverAddr.IP.To4())}
@@ -148,8 +151,7 @@ func connectToServer(clientAddr *net.TCPAddr, serverAddr *net.TCPAddr) (net.Conn
 		return nil, err
 	}
 
-	proxyToServerConn, err := net.FileConn(os.NewFile(uintptr(proxyToServerSock), ""))
-	return proxyToServerConn, err
+	return net.FileConn(os.NewFile(uintptr(proxyToServerSock), ""))
 }
 
 func lookupPeerAddr(addr *net.TCPAddr) (*net.TCPAddr, error) {

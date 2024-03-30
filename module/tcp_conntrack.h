@@ -55,16 +55,15 @@ lookup_tcp_connection_node(struct socket_address saddr,
 struct tcp_connection *lookup_tcp_connection_by_proxy_port(__be16 proxy_port);
 
 /**
- * Looks up the server address in a session with the given client.
+ * Looks up the host address in a session with the given peer.
  * The key of the hash table is the hash of both addresses, so to find the
  * connection we have to iterate all items and find the matching one, so the
  * runtime is O(n).
  * TODO: Optimize this function to run in O(1) time.
- * @param client_addr The client address.
- * @return The server address if found, 0 otherwise.
+ * @param peer_addr The peer address.
+ * @return The peer address if found, 0 otherwise.
  */
-struct socket_address
-lookup_server_address_by_client_address(struct socket_address client_addr);
+struct socket_address lookup_peer_address(struct socket_address addr);
 
 /**
  * Extracts a one-sided session from the packet and persists it in the hash

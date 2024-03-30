@@ -303,18 +303,17 @@ struct tcp_connection *lookup_tcp_connection_by_proxy_port(__be16 proxy_port) {
     return NULL;
 }
 
-struct socket_address
-lookup_server_address_by_client_address(struct socket_address client_addr) {
+struct socket_address lookup_peer_address(struct socket_address addr) {
     unsigned i;
     struct tcp_connection_node *conn_node;
-    struct socket_address server_addr = {.addr = 0, .port = 0};
+    struct socket_address peer_addr = {.addr = 0, .port = 0};
     hash_for_each(tcp_connections, i, conn_node, node) {
-        if (conn_node->conn.saddr.addr == client_addr.addr &&
-            conn_node->conn.saddr.port == client_addr.port) {
+        if (conn_node->conn.saddr.addr == addr.addr &&
+            conn_node->conn.saddr.port == addr.port) {
             return conn_node->conn.daddr;
         }
     }
-    return server_addr;
+    return peer_addr;
 }
 
 void track_one_sided_connection(packet_t *packet, direction_t direction) {

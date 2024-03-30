@@ -10,6 +10,8 @@
 #define FTP_DATA_PORT_BE (be16_to_cpu(20))
 #define FTP_CONTROL_PORT_BE (be16_to_cpu(21))
 #define FTP_CONTROL_PROXY_PORT_BE (be16_to_cpu(210))
+#define NIFI_PORT_BE (be16_to_cpu(8443))
+#define NIFI_PROXY_PORT_BE (be16_to_cpu(8444))
 
 #define FW_INTERNAL_PROXY_IP 0x0301010a
 #define FW_EXTERNAL_PROXY_IP 0x0302010a
@@ -29,34 +31,64 @@ enum proxy_response {
 };
 
 /**
- * Receives any type of packet and handle it according to the proxy, and returns
- * the action to be taken. This function modifies the packet and skb structs
- * according to the action it takes, but keeps the invariant that the addresses
+ * Receives any type of packet and handles it according to the proxy, and
+ * returns the verdict. This function modifies the packet and skb structs
+ * according to the verdict, but keeps the invariant that the addresses
  * in the packet struct are of the client and the server.
  * @param packet The packet struct that represents the packet.
  * @param skb The SKB struct that represents the packet.
  * @param state The state of the Netfilter hook.
- * @return The action to be taken.
+ * @return The verdict.
  */
 enum proxy_response handle_proxy_packet(packet_t *packet, struct sk_buff *skb,
                                         const struct nf_hook_state *state);
 
 /**
- * Receives a TCP packet sent from a client in the internal network, to a server
+ * Receives a TCP packet sent from a host in the internal network, to a host
  * in the external network.
  * If the packet is an HTTP or FTP packet, the destination IP and port will be
  * changed to the proxy process running in the userspace. The SKB's addresses
  * will change to the new addresses, but the packet struct will not. The IPv4
  * and TCP checksums are guaranteed to be fixed by the function.
+ * On the other hand, if the packet is sent from a Nifi server, we can assume
+ * it was sent as response to a request made by the proxy, so we accept it
+ * immediately.
  *
  * @param packet The packet struct that represents the packet.
  * @param skb The SKB struct that represents the packet.
  */
-enum proxy_response reroute_client_to_server_packet(packet_t *packet,
-                                                    struct sk_buff *skb);
+enum proxy_response handle_internal_to_external_packet(packet_t *packet,
+                                                       struct sk_buff *skb);
 
 /**
- * Receives a TCP packet sent from the firewall host to a client in the internal
+ * Receives a TCP packet sent from a host in the external network, to a
+ * host in the internal network.
+ * If the packet is a Nifi packet, we re-route it to the proxy.
+ * Otherwise, if the packet is an FTP data packet, we re-route it to the
+ * internal client.
+ * In the last case, if the packet is intended for the proxy and the proxy port
+ * is registered, we accept it immediately.
+ *
+ * @param packet The packet struct that represents the packet.
+ * @param skb The SKB struct that represents the packet.
+ */
+enum proxy_response handle_external_to_internal_packet(packet_t *packet,
+                                                       struct sk_buff *skb);
+
+/**
+ * Receives a TCP packet sent from the firewall host to a host in the external
+ * network. If this packet is sent from the Nifi proxy, we lookup the server's
+ * address and change the source address to it. Otherwise, if the packet sent by
+ * the proxy and the proxy port is registered, we accept immediately.
+ *
+ * @param packet The packet struct that represents the packet.
+ * @param skb The SKB struct that represents the packet.
+ */
+enum proxy_response handle_out_to_external_packet(packet_t *packet,
+                                                  struct sk_buff *skb);
+
+/**
+ * Receives a TCP packet sent from the firewall host to a host in the internal
  * network. If this packet is from one of the userspace proxy, the source
  * address and port will be changed to the address and port of the server in the
  * external network that sent the packet. The server address is matched by the
@@ -66,51 +98,18 @@ enum proxy_response reroute_client_to_server_packet(packet_t *packet,
  * @param packet The packet struct that represents the packet.
  * @param skb The SKB struct that represents the packet.
  */
-enum proxy_response reroute_proxy_to_client_packet(packet_t *packet,
-                                                   struct sk_buff *skb);
+enum proxy_response handle_out_to_internal_packet(packet_t *packet,
+                                                  struct sk_buff *skb);
 
 /**
- * Receives a packet sent from the external network to the firewall host, and
- * returns whether it's designated to the proxy.
- *
- * @param packet The packet struct that represents the packet.
- * @param skb The SKB struct that represents the packet.
- * @return Whether the packet is designated to the proxy.
- */
-bool is_server_to_proxy_response(packet_t *packet, struct sk_buff *skb);
-
-/**
- * Receives a packet sent from firewall host to the external network, and
- * returns whether it was sent from the proxy.
- *
- * @param packet The packet struct that represents the packet.
- * @param skb The SKB struct that represents the packet.
- * @return Whether the packet is sent from the proxy.
- */
-bool is_proxy_to_server_request(packet_t *packet, struct sk_buff *skb);
-
-/**
- * Receives a packet sent from the external network to the firewall host, and
- * if it's an FTP data packet (port 20), the destination IP and port will be
- * changed from the proxy's to the client's. The addresses will be changed both
- * in the SKB and the packet struct.
- *
- * @param packet The packet struct that represents the packet.
- * @param skb The SKB struct that represents the packet.
- * @return The action to be taken.
- */
-enum proxy_response reroute_server_to_client_ftp_data(packet_t *packet,
-                                                      struct sk_buff *skb);
-
-/**
- * Receives a packet sent forwarded from the client to an external server, and
+ * Receives a packet sent from an internal host to an external host, and
  * changes the source IP to be the proxy's, if it's an FTP data packet (dest
  * port 20). The address will be changed in the SKB and not in the packet
  * struct.
  *
  * @param packet The packet struct that represents the packet.
  * @param skb The SKB struct that represents the packet.
- * @return The action to be taken.
+ * @return Verdict.
  */
 enum proxy_response handle_ftp_data_connection_snat(packet_t *packet,
                                                     struct sk_buff *skb);
