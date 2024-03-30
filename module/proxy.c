@@ -3,19 +3,26 @@
 #include "proxy.h"
 #include "tcp_conntrack.h"
 
-static void fix_checksum(struct sk_buff *skb, struct iphdr *ip_header,
-                         struct tcphdr *tcp_header) {
-    // Fix TCP header checksum
+static inline void _fix_tcp_checksum(struct iphdr *ip_header,
+                                     struct tcphdr *tcp_header) {
     int tcplen = (ntohs(ip_header->tot_len) - ((ip_header->ihl) << 2));
     tcp_header->check = 0;
     tcp_header->check =
         tcp_v4_check(tcplen, ip_header->saddr, ip_header->daddr,
                      csum_partial((char *)tcp_header, tcplen, 0));
+}
 
-    // Fix IP header checksum
+static inline void _fix_ip_checksum(struct sk_buff *skb,
+                                    struct iphdr *ip_header) {
     ip_header->check = 0;
     ip_header->check = ip_fast_csum((u8 *)ip_header, ip_header->ihl);
     skb->ip_summed = CHECKSUM_NONE;
+}
+
+static void fix_checksum(struct sk_buff *skb, struct iphdr *ip_header,
+                         struct tcphdr *tcp_header) {
+    _fix_tcp_checksum(ip_header, tcp_header);
+    _fix_ip_checksum(skb, ip_header);
 }
 
 enum proxy_response handle_proxy_packet(packet_t *packet, struct sk_buff *skb,
