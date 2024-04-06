@@ -88,9 +88,10 @@ func allowFtpDataConnection(data []byte, dest net.Conn, logger zerolog.Logger) b
 
 func NewFtpProxy(address string, port uint16) *Proxy {
 	return &Proxy{
-		Protocol:       "ftp",
-		Address:        address,
-		Port:           port,
-		PacketCallback: allowFtpDataConnection,
+		Protocol:               "ftp",
+		Address:                address,
+		Port:                   port,
+		ClientToServerCallback: allowFtpDataConnection,
+		ServerToClientCallback: DefaultCallback,
 	}
 }

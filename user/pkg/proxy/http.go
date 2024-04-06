@@ -57,9 +57,10 @@ func blockDangerousFilesCallback(data []byte, dest net.Conn, logger zerolog.Logg
 
 func NewHttpProxy(address string, port uint16) *Proxy {
 	return &Proxy{
-		Protocol:       "http",
-		Address:        address,
-		Port:           port,
-		PacketCallback: blockDangerousFilesCallback,
+		Protocol:               "http",
+		Address:                address,
+		Port:                   port,
+		ClientToServerCallback: DefaultCallback,
+		ServerToClientCallback: blockDangerousFilesCallback,
 	}
 }
