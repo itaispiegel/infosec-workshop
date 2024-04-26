@@ -1,5 +1,6 @@
 # C Build
 *.o
+*.out
 
 # Kernel module
 *.ko
@@ -18,3 +19,7 @@ modules.order
 
 user/user
 !go.mod
+
+c-parser/lex.yy.c
+c-parser/project.tab.c
+c-parser/project.tab.h
