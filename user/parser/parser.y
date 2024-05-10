@@ -1,3 +1,8 @@
+%code requires {
+	#include <stdbool.h>
+	char *parse(char *string);
+}
+
 %{
     int yylex(void);
     void yyerror(const char *msg);
@@ -6,7 +11,6 @@
 	extern char *yyfilename;
 %}
 
-%token	INCLUDE INCLUDE_PATH IFDEF IFNDEF DEFINE ELSE_MACRO ENDIF
 %token  IDENTIFIER I_CONSTANT F_CONSTANT STRING_LITERAL FUNC_NAME SIZEOF
 %token	PTR_OP INC_OP DEC_OP LEFT_OP RIGHT_OP LE_OP GE_OP EQ_OP NE_OP
 %token	AND_OP OR_OP MUL_ASSIGN DIV_ASSIGN MOD_ASSIGN ADD_ASSIGN
@@ -16,7 +20,8 @@
 
 %token	TYPEDEF EXTERN STATIC AUTO REGISTER INLINE
 %token	CONST RESTRICT VOLATILE
-%token	BOOL CHAR SHORT INT SIZE_T SSIZE_T LONG SIGNED UNSIGNED FLOAT DOUBLE VOID
+%token	BOOL CHAR SHORT INT LONG SIGNED UNSIGNED FLOAT DOUBLE VOID
+%token  SIZE_T SSIZE_T
 %token	COMPLEX IMAGINARY
 %token	STRUCT UNION ENUM ELLIPSIS
 
@@ -42,7 +47,8 @@ constant
 	| ENUMERATION_CONSTANT	/* after it has been defined as such */
 	;
 
-enumeration_constant		/* before it has been defined as such */
+/* before it has been defined as such */
+enumeration_constant
 	: IDENTIFIER
 	;
 
@@ -202,16 +208,15 @@ declaration
 	: declaration_specifiers ';'
 	| declaration_specifiers init_declarator_list ';'
 	| static_assert_declaration
-	| include_specifier
+	/* | include_specifier
 	| ifdef_specifier
 	| ifndef_specifier
 	| define_specifier
 	| ELSE_MACRO
-	| ENDIF
-	| error
+	| ENDIF */
 	;
 
-include_specifier
+/* include_specifier
 	: INCLUDE '<' INCLUDE_PATH '>'
 	| INCLUDE STRING_LITERAL
 	;
@@ -228,7 +233,7 @@ define_specifier
 	: DEFINE IDENTIFIER
 	| DEFINE IDENTIFIER expression
 	| DEFINE IDENTIFIER specifier_qualifier_list
-	;
+	; */
 
 declaration_specifiers
 	: storage_class_specifier declaration_specifiers
@@ -341,7 +346,8 @@ enumerator_list
 	| enumerator_list ',' enumerator
 	;
 
-enumerator	/* identifiers must be flagged as ENUMERATION_CONSTANT */
+/* identifiers must be flagged as ENUMERATION_CONSTANT */
+enumerator
 	: enumeration_constant '=' constant_expression
 	| enumeration_constant
 	;
@@ -500,7 +506,6 @@ statement
 	| selection_statement
 	| iteration_statement
 	| jump_statement
-	| error
 	;
 
 labeled_statement
@@ -574,19 +579,35 @@ declaration_list
 
 %%
 #include <stdio.h>
+#include <string.h>
 
-int main() {
-    yyparse();
-    if(errors == 0) {
-    	printf("Parsing Successful\n");
-	} else {
-		printf("Got %d errors\n", errors);
+typedef struct yy_buffer_state * YY_BUFFER_STATE;
+extern YY_BUFFER_STATE yy_scan_string(char * str);
+extern void yy_delete_buffer(YY_BUFFER_STATE buffer);
+
+char *error_message = NULL;
+
+char *parse(char *string) {
+	YY_BUFFER_STATE buffer = yy_scan_string(string);
+	yyparse();
+	yy_delete_buffer(buffer);
+	return error_message;
+}
+
+unsigned int count_digits(int num) {
+	int n = 0;
+	if (num == 0) {
+		return 1;
 	}
-	return errors != 0;
+	while (num) {
+		num /= 10;
+		n++;
+	}
+	return n;
 }
 
 void yyerror(const char *s) {
 	extern int yylineno;
-	printf("%d: %s\n", yylineno, s);
-	errors++;
+	error_message = malloc(count_digits(yylineno) + strlen(s) + 3); // Add 1 for the colon, 1 for the space, and 1 for the null terminator
+	sprintf(error_message, "%d: %s", yylineno, s);
 }
