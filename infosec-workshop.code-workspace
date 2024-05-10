@@ -9,9 +9,6 @@
         {
             "path": "user"
         },
-        {
-            "path": "c-parser"
-        }
     ],
     "settings": {
         "files.exclude": {
@@ -20,6 +17,7 @@
         },
         "files.associations": {
             "*.h": "c",
+            "random": "c"
         }
     }
 }

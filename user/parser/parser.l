@@ -25,7 +25,7 @@ WS  [ \t\v\n\f]
 
 %{
 #include <stdio.h>
-#include "project.tab.h"
+#include "parser.tab.h"
 
 extern void yyerror(const char *);  /* prints grammar violation message */
 
@@ -40,13 +40,6 @@ static int check_type(void);
 %%
 "/*"                                    { comment(); }
 "//".*                                  { /* consume //-comment */ }
-
-"#include"                              { return(INCLUDE); }
-"#ifdef"                                { return(IFDEF); }
-"#ifndef"                               { return(IFNDEF); }
-"#define"                               { return(DEFINE); }
-"#else"                                 { return(ELSE_MACRO); }
-"#endif"                                { return(ENDIF); }
 
 "auto"					{ return(AUTO); }
 "break"					{ return(BREAK); }
@@ -112,7 +105,6 @@ static int check_type(void);
 {HP}{H}+"."{P}{FS}?			{ return F_CONSTANT; }
 
 ({SP}?\"([^"\\\n]|{ES})*\"{WS}*)+	{ return STRING_LITERAL; }
-{A}+(?:\/{A}+)*(?:\.h)?             { return INCLUDE_PATH; }
 
 "..."					{ return ELLIPSIS; }
 ">>="					{ return RIGHT_ASSIGN; }
