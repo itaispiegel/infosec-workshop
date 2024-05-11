@@ -34,7 +34,10 @@ func Parse(input string) ParserStatus {
 	}
 	errorCstr := C.parse(C.CString(preprocessed))
 	errorGoStr := C.GoString(errorCstr)
-	C.free(unsafe.Pointer(errorCstr))
-
-	return ParserStatus{Success: errorGoStr == "", Error: errorGoStr}
+	if errorGoStr == "" {
+		return ParserStatus{Success: true, Error: ""}
+	} else {
+		C.free(unsafe.Pointer(errorCstr))
+		return ParserStatus{Success: false, Error: errorGoStr}
+	}
 }

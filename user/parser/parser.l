@@ -29,10 +29,6 @@ WS  [ \t\v\n\f]
 
 extern void yyerror(const char *);  /* prints grammar violation message */
 
-extern int sym_type(const char *);  /* returns type from symbol table */
-
-#define sym_type(identifier) IDENTIFIER /* with no symbol table, fake it */
-
 static void comment(void);
 static int check_type(void);
 %}
@@ -59,8 +55,6 @@ static int check_type(void);
 "if"					{ return(IF); }
 "inline"				{ return(INLINE); }
 "int"					{ return(INT); }
-"size_t"				{ return(SIZE_T); }
-"ssize_t"				{ return(SSIZE_T); }
 "long"					{ return(LONG); }
 "register"				{ return(REGISTER); }
 "restrict"				{ return(RESTRICT); }
@@ -153,12 +147,12 @@ static int check_type(void);
 "|"					{ return '|'; }
 "?"					{ return '?'; }
 
-{WS}+					{ /* whitespace separates tokens */ }
+{WS}+				{ /* whitespace separates tokens */ }
 .					{ /* discard bad characters */ }
 
 %%
 
-int yywrap(void) {        /* called at end of input */
+int yywrap(void) {      /* called at end of input */
     return 1;           /* terminate now */
 }
 
@@ -179,12 +173,10 @@ static void comment(void) {
 }
 
 static int check_type(void) {
-    switch (sym_type(yytext)) {
-    case TYPEDEF_NAME:                /* previously defined */
+    // Consider tokens ending with "_t" as typedef_name
+    size_t token_length = strlen(yytext);
+    if (token_length > 2 && yytext[token_length - 2] == '_' && yytext[token_length - 1] == 't') {
         return TYPEDEF_NAME;
-    case ENUMERATION_CONSTANT:        /* previously defined */
-        return ENUMERATION_CONSTANT;
-    default:                          /* includes undefined */
-        return IDENTIFIER;
     }
+    return IDENTIFIER;
 }
