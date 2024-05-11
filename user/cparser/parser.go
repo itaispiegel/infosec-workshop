@@ -14,30 +14,30 @@ import (
 
 var ErrEmptyString = errors.New("empty string")
 
-// ParserStatus represents the result of parsing an input string as C code.
+// CParserResult represents the result of parsing an input string as C code.
 // Success is true if the input was successfully parsed, and false otherwise.
 // Error contains an error message if Success is false.
-type ParserStatus struct {
+type CParserResult struct {
 	Success bool   `yaml:"success"`
 	Error   string `yaml:"error"`
 }
 
 // Parses the input as C code, and returns the result of the parsing.
-func Parse(input string) ParserStatus {
+func Parse(input string) CParserResult {
 	trimmedInput := strings.TrimSpace(input)
 	if len(trimmedInput) == 0 {
-		return ParserStatus{Success: false, Error: ErrEmptyString.Error()}
+		return CParserResult{Success: false, Error: ErrEmptyString.Error()}
 	}
-	preprocessed, err := Preprocess(trimmedInput)
+	preprocessed, err := RunPreprocessor(trimmedInput)
 	if err != nil {
-		return ParserStatus{Success: false, Error: err.Error()}
+		return CParserResult{Success: false, Error: err.Error()}
 	}
 	errorCstr := C.parse(C.CString(preprocessed))
 	errorGoStr := C.GoString(errorCstr)
 	if errorGoStr == "" {
-		return ParserStatus{Success: true, Error: ""}
+		return CParserResult{Success: true, Error: ""}
 	} else {
 		C.free(unsafe.Pointer(errorCstr))
-		return ParserStatus{Success: false, Error: errorGoStr}
+		return CParserResult{Success: false, Error: errorGoStr}
 	}
 }
