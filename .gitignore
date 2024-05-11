@@ -20,6 +20,6 @@ modules.order
 user/user
 !go.mod
 
-user/parser/lex.yy.c
-user/parser/parser.tab.c
-user/parser/parser.tab.h
+user/cparser/lex.yy.c
+user/cparser/parser.tab.c
+user/cparser/parser.tab.h
