@@ -8,7 +8,7 @@ import (
 const defaultAddress = "10.1.1.3"
 
 var addr string
-var httpPort, ftpPort, nifiPort uint16
+var httpPort, ftpPort, nifiPort, smtpPort uint16
 
 var baseProxyCmd = &cobra.Command{
 	Use:   "proxy",
@@ -33,6 +33,12 @@ var nifiProxyCmd = &cobra.Command{
 	RunE:  executeNifiProxy,
 }
 
+var smtpProxyCmd = &cobra.Command{
+	Use:   "smtp",
+	Short: "Start an SMTP proxy server",
+	RunE:  executeSmtpProxy,
+}
+
 func executeHttpProxy(cmd *cobra.Command, args []string) error {
 	httpProxy := proxy.NewHttpProxy(addr, httpPort)
 	return httpProxy.Start()
@@ -48,6 +54,11 @@ func executeNifiProxy(cmd *cobra.Command, args []string) error {
 	return nifiProxy.Start()
 }
 
+func executeSmtpProxy(cmd *cobra.Command, args []string) error {
+	smtpProxy := proxy.NewSmtpProxy(addr, smtpPort)
+	return smtpProxy.Start()
+}
+
 func init() {
 	httpProxyCmd.Flags().StringVar(&addr, "address", defaultAddress, "The address to listen on")
 	httpProxyCmd.Flags().Uint16Var(&httpPort, "port", 800, "The port to listen on")
@@ -55,6 +66,8 @@ func init() {
 	ftpProxyCmd.Flags().Uint16Var(&ftpPort, "port", 210, "The port to listen on")
 	nifiProxyCmd.Flags().StringVar(&addr, "address", defaultAddress, "The address to listen on")
 	nifiProxyCmd.Flags().Uint16Var(&nifiPort, "port", 8444, "The port to listen on")
+	smtpProxyCmd.Flags().StringVar(&addr, "address", defaultAddress, "The address to listen on")
+	smtpProxyCmd.Flags().Uint16Var(&smtpPort, "port", 250, "The port to listen on")
 
 	baseProxyCmd.AddCommand(httpProxyCmd)
 	baseProxyCmd.AddCommand(ftpProxyCmd)

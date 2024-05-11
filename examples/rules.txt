@@ -1,6 +1,7 @@
 loopback any 127.0.0.1/8 127.0.0.1/8 any any any any accept
 http any 10.1.1.1/32 10.1.2.2/32 TCP >1023 80 any accept
 http any 10.1.1.1/32 10.1.2.2/32 TCP >1023 8000 any accept
+smtp any 10.1.1.1/32 10.1.2.2/32 TCP >1023 25 any accept
 nifi any 10.1.2.0/24 10.1.1.5/32 TCP >1023 8443 any accept
 ftp any 10.1.1.1/32 10.1.2.2/32 TCP >1023 21 any accept
 GW_attack any any 10.0.2.15/32 any any any any drop
