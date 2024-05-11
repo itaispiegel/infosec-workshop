@@ -1,6 +1,13 @@
 ## Introduction
-This directory contains the userspace program which is used to manage the firewall - save and load rules.
+This directory contains the userspace program used to manage the firewall - save and load rules.
 This program is implemented in Go, which can be installed from [here](https://go.dev/doc/install).
+
+### Building & Running
+```bash
+go generate -v ./cparser
+go build
+./user
+```
 
 ### Debugging
 To debug the code, please install the [Go Delve debugger](https://github.com/go-delve/delve), by running:
