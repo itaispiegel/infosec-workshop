@@ -40,7 +40,7 @@ func SplitLines(input string) []string {
 // Runs the preprocessor on the given input and returns the file with the preprocessor directives removed.
 // If the preprocessor fails, an error is returned.
 // The preprocessor can fail if an invalid directive is used.
-func Preprocess(input string) (string, error) {
+func RunPreprocessor(input string) (string, error) {
 	lines := SplitLines(input)
 	preprocessedLines := make([]string, 0)
 	joinedLines := joinLines(lines)

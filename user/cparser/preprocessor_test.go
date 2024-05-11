@@ -22,7 +22,7 @@ func TestPreprocessor(t *testing.T) {
 
 			input, err := os.ReadFile(inputFilePath)
 			assert.NoError(t, err)
-			actual, preprocessError := Preprocess(string(input))
+			actual, preprocessError := RunPreprocessor(string(input))
 			if _, err := os.Stat(preprocessedFilePath); os.IsNotExist(err) {
 				assert.ErrorIs(t, preprocessError, ErrPreprocessorFailed, "Test case '%s' didn't return a preprocessor error", testName)
 			} else {
@@ -45,7 +45,7 @@ func TestParser(t *testing.T) {
 			input, err := os.ReadFile(inputFilePath)
 			assert.NoError(t, err)
 
-			expectedParserStatus := ParserStatus{}
+			expectedParserStatus := CParserResult{}
 			parserStatusBytes, err := os.ReadFile(parserStatusPath)
 			assert.NoError(t, err)
 			yaml.Unmarshal(parserStatusBytes, &expectedParserStatus)
