@@ -6,9 +6,6 @@
 %{
     int yylex(void);
     void yyerror(const char *msg);
-    int errors = 0;
-
-	extern char *yyfilename;
 %}
 
 %token  IDENTIFIER I_CONSTANT F_CONSTANT STRING_LITERAL FUNC_NAME SIZEOF
@@ -21,7 +18,6 @@
 %token	TYPEDEF EXTERN STATIC AUTO REGISTER INLINE
 %token	CONST RESTRICT VOLATILE
 %token	BOOL CHAR SHORT INT LONG SIGNED UNSIGNED FLOAT DOUBLE VOID
-%token  SIZE_T SSIZE_T
 %token	COMPLEX IMAGINARY
 %token	STRUCT UNION ENUM ELLIPSIS
 
@@ -208,32 +204,7 @@ declaration
 	: declaration_specifiers ';'
 	| declaration_specifiers init_declarator_list ';'
 	| static_assert_declaration
-	/* | include_specifier
-	| ifdef_specifier
-	| ifndef_specifier
-	| define_specifier
-	| ELSE_MACRO
-	| ENDIF */
 	;
-
-/* include_specifier
-	: INCLUDE '<' INCLUDE_PATH '>'
-	| INCLUDE STRING_LITERAL
-	;
-
-ifdef_specifier
-	: IFDEF IDENTIFIER
-	;
-
-ifndef_specifier
-	: IFNDEF IDENTIFIER
-	;
-
-define_specifier
-	: DEFINE IDENTIFIER
-	| DEFINE IDENTIFIER expression
-	| DEFINE IDENTIFIER specifier_qualifier_list
-	; */
 
 declaration_specifiers
 	: storage_class_specifier declaration_specifiers
@@ -273,8 +244,6 @@ type_specifier
 	| CHAR
 	| SHORT
 	| INT
-	| SIZE_T
-	| SSIZE_T
 	| LONG
 	| FLOAT
 	| DOUBLE
@@ -581,20 +550,12 @@ declaration_list
 #include <stdio.h>
 #include <string.h>
 
-typedef struct yy_buffer_state * YY_BUFFER_STATE;
-extern YY_BUFFER_STATE yy_scan_string(char * str);
-extern void yy_delete_buffer(YY_BUFFER_STATE buffer);
+extern struct yy_buffer_state *yy_scan_string(char * str);
+extern void yy_delete_buffer(struct yy_buffer_state *buffer);
 
 char *error_message = NULL;
 
-char *parse(char *string) {
-	YY_BUFFER_STATE buffer = yy_scan_string(string);
-	yyparse();
-	yy_delete_buffer(buffer);
-	return error_message;
-}
-
-unsigned int count_digits(int num) {
+static unsigned int count_digits(int num) {
 	int n = 0;
 	if (num == 0) {
 		return 1;
@@ -604,6 +565,13 @@ unsigned int count_digits(int num) {
 		n++;
 	}
 	return n;
+}
+
+char *parse(char *string) {
+	struct yy_buffer_state *buffer = yy_scan_string(string);
+	yyparse();
+	yy_delete_buffer(buffer);
+	return error_message;
 }
 
 void yyerror(const char *s) {
