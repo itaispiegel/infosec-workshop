@@ -30,7 +30,6 @@ WS  [ \t\v\n\f]
 extern void yyerror(const char *);  /* prints grammar violation message */
 
 static void comment(void);
-static int check_type(void);
 %}
 
 %%
@@ -84,7 +83,8 @@ static int check_type(void);
 "__func__"                              { return FUNC_NAME; }
 "__attribute__"                         { return ATTRIBUTE; }
 
-{L}{A}*					{ return check_type(); }
+{L}{A}*"_t"             { return TYPEDEF_NAME; }
+{L}{A}*					{ return IDENTIFIER; }
 
 {HP}{H}+{IS}?				{ return I_CONSTANT; }
 {NZ}{D}*{IS}?				{ return I_CONSTANT; }
@@ -170,13 +170,4 @@ static void comment(void) {
                 break;
         }
     yyerror("unterminated comment");
-}
-
-static int check_type(void) {
-    // Consider tokens ending with "_t" as typedef_name
-    size_t token_length = strlen(yytext);
-    if (token_length > 2 && yytext[token_length - 2] == '_' && yytext[token_length - 1] == 't') {
-        return TYPEDEF_NAME;
-    }
-    return IDENTIFIER;
 }
