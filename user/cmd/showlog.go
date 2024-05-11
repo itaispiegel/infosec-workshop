@@ -6,9 +6,10 @@ import (
 )
 
 var showLogCmd = &cobra.Command{
-	Use:   "show_log",
-	Short: "Show the firewall log",
-	RunE:  executeShowLog,
+	Use:    "show_log",
+	Short:  "Show the firewall log",
+	PreRun: ensureKernelModuleLoaded,
+	RunE:   executeShowLog,
 }
 
 func executeShowLog(cmd *cobra.Command, args []string) error {

@@ -8,9 +8,10 @@ import (
 )
 
 var showRulesCmd = &cobra.Command{
-	Use:   "show_rules",
-	Short: "Show the firewall rules",
-	RunE:  executeShowRules,
+	Use:    "show_rules",
+	Short:  "Show the firewall rules",
+	PreRun: ensureKernelModuleLoaded,
+	RunE:   executeShowRules,
 }
 
 func executeShowRules(cmd *cobra.Command, args []string) error {
