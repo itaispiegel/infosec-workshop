@@ -6,9 +6,10 @@ import (
 )
 
 var clearLogCmd = &cobra.Command{
-	Use:   "clear_log",
-	Short: "Clear the firewall logs table",
-	RunE:  executeClearLog,
+	Use:    "clear_log",
+	Short:  "Clear the firewall logs table",
+	PreRun: ensureKernelModuleLoaded,
+	RunE:   executeClearLog,
 }
 
 func executeClearLog(cmd *cobra.Command, args []string) error {

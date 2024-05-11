@@ -6,9 +6,10 @@ import (
 )
 
 var showConnsCmd = &cobra.Command{
-	Use:   "show_conns",
-	Short: "Shows the open connections table",
-	RunE:  executeShowConns,
+	Use:    "show_conns",
+	Short:  "Shows the open connections table",
+	PreRun: ensureKernelModuleLoaded,
+	RunE:   executeShowConns,
 }
 
 func executeShowConns(cmd *cobra.Command, args []string) error {

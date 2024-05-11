@@ -15,10 +15,11 @@ const (
 )
 
 var loadCmd = &cobra.Command{
-	Use:   "load_rules [rules_file]",
-	Short: "Load the firewall rules from a given file",
-	Args:  cobra.ExactArgs(1),
-	RunE:  executeLoadRules,
+	Use:    "load_rules [rules_file]",
+	Short:  "Load the firewall rules from a given file",
+	Args:   cobra.ExactArgs(1),
+	PreRun: ensureKernelModuleLoaded,
+	RunE:   executeLoadRules,
 }
 
 func executeLoadRules(cmd *cobra.Command, args []string) error {
