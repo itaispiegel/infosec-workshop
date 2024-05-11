@@ -1,4 +1,4 @@
-package parser
+package cparser
 
 //go:generate bison -d parser.y
 //go:generate lex parser.l
