@@ -1,17 +1,17 @@
 ## Introduction
 This directory contains the userspace program designed for firewall management.
-This tool facilitates rules and log manipulation, and includes the HTTP, FTP, SMTP proxies.
+This tool facilitates rules and log manipulation, and includes the HTTP, FTP, SMTP and NiFi proxies.
 Implemented in Go, which can be installed from [here](https://go.dev/doc/install).
 
 ### Building & Running
 ```bash
-go generate -v ./cparser
+go generate -v ./...
 go build
 ./user
 ```
 
 ### Debugging
-To debug the code, please install the [Go Delve debugger](https://github.com/go-delve/delve), by running:
+To debug the code, install the [Go Delve debugger](https://github.com/go-delve/delve), by running:
 ```bash
 go install github.com/go-delve/delve/cmd/dlv
 ```
@@ -19,7 +19,7 @@ go install github.com/go-delve/delve/cmd/dlv
 This will install the debugger by default to `~/go/bin/dlv`.
 Then you can execute the following to debug your code:
 ```bash
-sudo ~/go/bin/dlv debug -- SOME_ARGS
+sudo ~/go/bin/dlv debug -- <ARGS>
 ```
 Notice that you will probably want to debug this with sudo permissions, since the program needs permissions to interact with the kernel module.
 Delve's interface is very similar to GDB, so if you're familiar with it - you should be fine.
@@ -32,16 +32,16 @@ More description down below.
 
 ### HTTP Proxy
 Implemented in stage 4 of the workshop, the HTTP proxy runs by default on port 800, and blocks CSV and ZIP files sent from the internal network, to the external.
-The files are blocked according the HTTP `Content-Type` header.
+The files are blocked according to the HTTP `Content-Type` header.
 In stage 5, we added DLP, for disallowing C source code to be sent from the internal network to the external.
 The DLP works by blocking packets having the `text/x-chdr` and `text/x-csrc` headers, and by blocking packets that can be parsed with our custom [cparser](#c-parser).
 
 
 ### FTP Proxy
-FTP is not very friendly with firewalls...
+FTP is not very friendly with firewalls...<br/>
 Implemented in stage 4, the FTP proxy runs by default on port 210.
-The client first initiates the communication with the server, and then it sends it a port it will listen on (FTP command PORT).
-The server receives this command, and connects to the client in the received port, and the files are sent over it.
+In FTP the client first initiates the communication with the server, and then it sends it a port it will listen on ([FTP PORT command](https://www.techtarget.com/searchnetworking/tip/Understanding-the-FTP-PORT-command)).
+The server receives this command, and connects to the client in the received port from port 20, and the files are sent this connection.
 The purpose of this proxy is to allow this communication to work, and to make the firewall accept the data session.
 
 ### NiFi Proxy
@@ -60,23 +60,23 @@ If the message's body can be parsed with our C parser, the packet is dropped.
 
 ### C Parser
 In stage 5 we added a DLP protection layer, for blocking C source code being sent outside to the external network, in HTTP and SMTP packets.
-A necessary step to add this layer, is to be able to detect C source code, and this is done with a parser I implemented.
+A necessary step for adding this layer, is to be able to detect C source code, and this is done with a parser I implemented.
 At first I thought about different approaches to tackle this challenge.
 My first attempt was to use NLP and Machine Learning. I found some impressive looking open source classifiers for the detection of different programming languages, such as:
 - https://guesslang.readthedocs.io/en/latest/
 - https://huggingface.co/philomath-1209/programming-language-identification
 
-Unfortunately though, I wasn't able to run them locally, since our VM is 32-bit, and they are supported only on 64-bit VMs.
+Unfortunately though, I wasn't able to run them locally, since our VM is 32-bit, and they are supported only on 64-bit systems.
 
 I then decided to go with a completely different approach, and take advantage of the tools I learned this semester, by taking the compilation course (0368-3133) 😎.
-I decided to run the first two stages of the C compiler on the text; i.e running the lexer and the parser.
-I implemented it by defining C's formal grammar, and using [YACC](https://en.wikipedia.org/wiki/Yacc) for generating an [LALR parser](https://en.wikipedia.org/wiki/LALR_parser).
+I decided to run the first two stages of the C compiler on the text; i.e running the lexer and the syntax analyzer.
+I implemented it by defining C's formal grammar, and using [Bison](https://en.wikipedia.org/wiki/GNU_Bison) for generating an [LALR parser](https://en.wikipedia.org/wiki/LALR_parser).
 For defining the formal grammar, I took inspiration from [here](https://www.lysator.liu.se/c/ANSI-C-grammar-y.html) and made adjustments.
 
 Some of the considerations behind this approach:
 - Running a custom parser with the first two phases is simplistic and yields good performance.
 
-- By design, we don't want to run [semantic analysis](https://en.wikipedia.org/wiki/Semantic_analysis_(compilers)) on source code.
+- By design, we don't want to run [semantic analysis](https://en.wikipedia.org/wiki/Semantic_analysis_(compilers)) on the source code.
 This step involves type checking, and the management of the symbol table.
 We don't want to have a symbol table, since we can receive partial code, and more specifically, we usually usually don't have all of the variables and functions defined in the received scope.
 The downside of this approach, is that C code with type errors will pass successfully.
