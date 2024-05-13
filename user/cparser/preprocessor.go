@@ -4,11 +4,11 @@ import (
 	"errors"
 	"slices"
 	"strings"
+
+	"github.com/itaispiegel/infosec-workshop/user/pkg/utils"
 )
 
 const (
-	crlf            = "\r\n"
-	lf              = "\n"
 	directivePrefix = "#"
 )
 
@@ -37,8 +37,8 @@ var ErrPreprocessorFailed = errors.New("preprocessing failed")
 
 // Splits the given input into lines, normalizing line endings to LF.
 func SplitLines(input string) []string {
-	normalized := strings.ReplaceAll(input, crlf, lf)
-	return strings.Split(normalized, lf)
+	normalized := strings.ReplaceAll(input, utils.CRLF, utils.LF)
+	return strings.Split(normalized, utils.LF)
 }
 
 // Runs the preprocessor on the given input and returns the file with the preprocessor directives removed.
