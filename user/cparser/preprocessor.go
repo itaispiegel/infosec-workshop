@@ -12,6 +12,9 @@ const (
 	directivePrefix = "#"
 )
 
+// Types of preprocessor directives.
+// The implemented preprocessor only checks that each directive's type is valid.
+// It doesn't check the directive's arguments.
 var directiveTypes = []string{
 	"assert",
 	"define",
@@ -29,6 +32,7 @@ var directiveTypes = []string{
 	"warning",
 }
 
+// Returned when an unsupported directive is used.
 var ErrPreprocessorFailed = errors.New("preprocessing failed")
 
 // Splits the given input into lines, normalizing line endings to LF.
@@ -78,7 +82,7 @@ func validatePreprocessorDirective(directive string) bool {
 	spaceIndex := strings.Index(directiveWithoutPrefix, " ")
 	var directiveType string
 	if spaceIndex == -1 {
-		directiveType = directiveWithoutPrefix
+		directiveType = directiveWithoutPrefix // In this case the directive has only one argument
 	} else {
 		directiveType = directiveWithoutPrefix[:spaceIndex]
 	}

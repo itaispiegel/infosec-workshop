@@ -9,6 +9,8 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// Runs the parser on all tests cases in the testdata directory.
+// Assert that the output is equal to the expected parser result.
 func TestParser(t *testing.T) {
 	testCases := getTestCases(t)
 	for _, testName := range testCases {

@@ -8,6 +8,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// Runs the preprocessor on all tests cases in the testdata directory.
+// Assert that the output is equal to the expected preprocessed code.
 func TestPreprocessor(t *testing.T) {
 	testCases := getTestCases(t)
 	for _, testName := range testCases {
