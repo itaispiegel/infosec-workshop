@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"github.com/itaispiegel/infosec-workshop/user/pkg/logs"
+	"github.com/itaispiegel/infosec-workshop/user/pkg/fwlogs"
 	"github.com/spf13/cobra"
 )
 
@@ -13,7 +13,7 @@ var clearLogCmd = &cobra.Command{
 }
 
 func executeClearLog(cmd *cobra.Command, args []string) error {
-	return logs.ClearLogsDevice()
+	return fwlogs.ClearLogsDevice()
 }
 
 func init() {
