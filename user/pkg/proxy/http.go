@@ -20,6 +20,16 @@ var dangerousContentTypes = []string{
 	"text/x-csrc",
 }
 
+func NewHttpProxy(address string, port uint16) *Proxy {
+	return &Proxy{
+		Protocol:               "http",
+		Address:                address,
+		Port:                   port,
+		ClientToServerCallback: DefaultCallback,
+		ServerToClientCallback: blockFilesCallback,
+	}
+}
+
 // Sends a 403 Forbidden response to the client with the given reason
 func sendBlockedResponse(dest net.Conn, reason string) error {
 	msg := fmt.Sprintf("Blocked by Firewall (%s)\n", reason)
@@ -59,6 +69,7 @@ func getContentTypeFromData(data []byte) string {
 	return ""
 }
 
+// Callback function that blocks files with dangerous content types.
 func blockFilesCallback(data []byte, dest net.Conn, logger zerolog.Logger) bool {
 	for i := range dangerousContentTypes {
 		if contentType := getContentTypeFromData(data); contentType == dangerousContentTypes[i] {
@@ -93,14 +104,4 @@ func blockFilesCallback(data []byte, dest net.Conn, logger zerolog.Logger) bool 
 		return false
 	}
 	return true
-}
-
-func NewHttpProxy(address string, port uint16) *Proxy {
-	return &Proxy{
-		Protocol:               "http",
-		Address:                address,
-		Port:                   port,
-		ClientToServerCallback: DefaultCallback,
-		ServerToClientCallback: blockFilesCallback,
-	}
 }

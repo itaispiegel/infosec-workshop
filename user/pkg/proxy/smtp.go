@@ -10,7 +10,18 @@ import (
 	"github.com/rs/zerolog"
 )
 
-func blockCSourceCode(data []byte, dest net.Conn, logger zerolog.Logger) bool {
+func NewSmtpProxy(address string, port uint16) *Proxy {
+	return &Proxy{
+		Protocol:               "smtp",
+		Address:                address,
+		Port:                   port,
+		ClientToServerCallback: DefaultCallback,
+		ServerToClientCallback: blockCSourceCodeCallback,
+	}
+}
+
+// Blocks emails with C source code.
+func blockCSourceCodeCallback(data []byte, dest net.Conn, logger zerolog.Logger) bool {
 	r := strings.NewReader(string(data))
 	m, err := mail.ReadMessage(r)
 	if err != nil {
@@ -30,14 +41,4 @@ func blockCSourceCode(data []byte, dest net.Conn, logger zerolog.Logger) bool {
 	}
 
 	return true
-}
-
-func NewSmtpProxy(address string, port uint16) *Proxy {
-	return &Proxy{
-		Protocol:               "smtp",
-		Address:                address,
-		Port:                   port,
-		ClientToServerCallback: DefaultCallback,
-		ServerToClientCallback: blockCSourceCode,
-	}
 }
