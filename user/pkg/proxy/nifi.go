@@ -17,6 +17,19 @@ const (
 	vulnerableDatabaseUrlPrefix = "jdbc:h2"
 )
 
+func NewNifiProxy(address string, port uint16) *Proxy {
+	return &Proxy{
+		Protocol:               "nifi",
+		Address:                address,
+		Port:                   port,
+		ServerToClientCallback: DefaultCallback,
+		ClientToServerCallback: protectFromCveCallback,
+		TLSEnabled:             true,
+		CommonName:             "nifi.com",
+	}
+}
+
+// Detects if the request is trying to exploit the CVE-2023-34468 vulnerability.
 func detectExploit(req *http.Request) bool {
 	if req.Method != http.MethodPut || !strings.HasPrefix(req.URL.String(), vulnerableEndpoint) {
 		return false
@@ -43,10 +56,11 @@ func detectExploit(req *http.Request) bool {
 	return strings.HasPrefix(strings.ToLower(databaseUrl), vulnerableDatabaseUrlPrefix)
 }
 
-// Protects from CVE 2023-34468
-// Works like the official vulnerability fix
+// Protects from CVE 2023-34468, by blocking client requests to the dangerous
+// API endpoint with dangerous payload.
+// Works like the official vulnerability fix:
 // https://github.com/apache/nifi/pull/7349/files
-func protectFromCve(data []byte, dest net.Conn, logger zerolog.Logger) bool {
+func protectFromCveCallback(data []byte, dest net.Conn, logger zerolog.Logger) bool {
 	req, err := http.ReadRequest(bufio.NewReader(bytes.NewReader(data)))
 	if err != nil {
 		logger.Error().Err(err).Msg("Error reading request")
@@ -67,16 +81,4 @@ func protectFromCve(data []byte, dest net.Conn, logger zerolog.Logger) bool {
 		return false
 	}
 	return true
-}
-
-func NewNifiProxy(address string, port uint16) *Proxy {
-	return &Proxy{
-		Protocol:               "nifi",
-		Address:                address,
-		Port:                   port,
-		ServerToClientCallback: DefaultCallback,
-		ClientToServerCallback: protectFromCve,
-		TLSEnabled:             true,
-		CommonName:             "nifi.com",
-	}
 }
