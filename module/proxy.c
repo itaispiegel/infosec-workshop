@@ -70,6 +70,11 @@ enum proxy_response handle_internal_to_external_packet(packet_t *packet,
         packet->ip_header->daddr = FW_INTERNAL_PROXY_IP;
         fix_checksum(skb, packet->ip_header, packet->tcp_header);
         return HANDLED;
+    } else if (packet->dst_port == SMTP_PORT_BE) {
+        packet->tcp_header->dest = SMTP_PROXY_PORT_BE;
+        packet->ip_header->daddr = FW_INTERNAL_PROXY_IP;
+        fix_checksum(skb, packet->ip_header, packet->tcp_header);
+        return HANDLED;
     } else if (packet->src_port == NIFI_PORT_BE) {
         // In this case we can assume the packet is sent
         // as a response to a request made by the proxy
@@ -135,7 +140,8 @@ enum proxy_response handle_out_to_internal_packet(packet_t *packet,
     struct socket_address internal_addr = {.addr = packet->dst_ip,
                                            .port = packet->dst_port};
     if (packet->src_port == HTTP_PROXY_PORT_BE ||
-        packet->src_port == FTP_CONTROL_PROXY_PORT_BE) {
+        packet->src_port == FTP_CONTROL_PROXY_PORT_BE ||
+        packet->src_port == SMTP_PROXY_PORT_BE) {
         if ((external_addr = lookup_peer_address(internal_addr)).addr == 0) {
             printk(KERN_DEBUG "Dropping unrelated packet\n");
             return DROP_IMMEDIATELY;

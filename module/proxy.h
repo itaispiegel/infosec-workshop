@@ -12,6 +12,8 @@
 #define FTP_CONTROL_PROXY_PORT_BE (be16_to_cpu(210))
 #define NIFI_PORT_BE (be16_to_cpu(8443))
 #define NIFI_PROXY_PORT_BE (be16_to_cpu(8444))
+#define SMTP_PORT_BE (be16_to_cpu(25))
+#define SMTP_PROXY_PORT_BE (be16_to_cpu(250))
 
 #define FW_INTERNAL_PROXY_IP 0x0301010a
 #define FW_EXTERNAL_PROXY_IP 0x0302010a

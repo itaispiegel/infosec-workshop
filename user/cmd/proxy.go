@@ -72,5 +72,6 @@ func init() {
 	baseProxyCmd.AddCommand(httpProxyCmd)
 	baseProxyCmd.AddCommand(ftpProxyCmd)
 	baseProxyCmd.AddCommand(nifiProxyCmd)
+	baseProxyCmd.AddCommand(smtpProxyCmd)
 	RootCmd.AddCommand(baseProxyCmd)
 }
