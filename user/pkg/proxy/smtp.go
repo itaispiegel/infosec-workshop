@@ -132,7 +132,11 @@ func doesEmailContainCSourceCode(m *mail.Message, logger zerolog.Logger) bool {
 func blockCSourceCodeCallback(data []byte, dest net.Conn, logger zerolog.Logger) bool {
 	r := strings.NewReader(string(data))
 	if m, err := mail.ReadMessage(r); err == nil {
-		logger.Info().Msg("Got a new email")
+		logger.Info().
+			Str("from", m.Header.Get("From")).
+			Str("To", m.Header.Get("To")).
+			Str("Subject", m.Header.Get("Subject")).
+			Msg("Got a new email")
 		if doesEmailContainCSourceCode(m, logger) {
 			return false
 		}
