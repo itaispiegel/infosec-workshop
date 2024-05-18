@@ -1,7 +1,6 @@
 package proxy
 
 import (
-	"fmt"
 	"net"
 	"regexp"
 	"strconv"
@@ -49,20 +48,6 @@ func extractFtpDataBindAddr(numbers string) (*net.TCPAddr, error) {
 	return &tcpAddr, nil
 }
 
-// Receives an IP address, and returns a string representation of it in the FTP format.
-func ipToFtpRepresentation(ip net.IP) string {
-	ipv4Addr := ip.To4()
-	return fmt.Sprintf("%d,%d,%d,%d", ipv4Addr[0], ipv4Addr[1], ipv4Addr[2], ipv4Addr[3])
-}
-
-// Creates a PORT command payload for the FTP server with the given IP address and port.
-func createPortCommandPayload(ipAddr net.IP, port int) string {
-	return fmt.Sprintf("PORT %s,%d,%d\r\n",
-		ipToFtpRepresentation(ipAddr),
-		port/256, port%256,
-	)
-}
-
 // Callback function that allows FTP data connections.
 // It extracts the client's data connection address from the PORT command,
 // and allows the connection in the firewall.
@@ -88,25 +73,14 @@ func allowFtpDataConnection(data []byte, dest net.Conn, logger zerolog.Logger) b
 				Msg("Error allowing FTP data connection, blocking connection")
 			return false
 		}
-
-		proxyIpAddr := dest.LocalAddr().(*net.TCPAddr).IP
-		payloadToServer := createPortCommandPayload(proxyIpAddr, clientDataAddr.Port)
-		if _, err := dest.Write([]byte(payloadToServer)); err != nil {
-			log.Error().Err(err).
-				Str("clientAddr", clientDataAddr.String()).
-				Str("serverAddr", serverDataAddr.String()).
-				Msg("Error sending FTP data connection payload to server, blocking connection")
-			return false
-		}
 		log.Info().
 			Str("bindAddr", clientDataAddr.String()).
 			Str("serverAddr", serverDataAddr.String()).
 			Msg("Successfully allowed new FTP data connection")
-	} else {
-		if _, err := dest.Write(data); err != nil {
-			logger.Error().Err(err).Msg("Error forwarding data")
-			return false
-		}
+	}
+	if _, err := dest.Write(data); err != nil {
+		logger.Error().Err(err).Msg("Error forwarding data")
+		return false
 	}
 	return true
 }

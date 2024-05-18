@@ -28,12 +28,12 @@ static void fix_checksum(struct sk_buff *skb, struct iphdr *ip_header,
 enum proxy_response handle_proxy_packet(packet_t *packet, struct sk_buff *skb,
                                         const struct nf_hook_state *state) {
     if (packet->protocol != PROT_TCP) {
-        return UNHANDLED;
+        return CONTINUE;
     }
 
     switch (state->hook) {
     case NF_INET_POST_ROUTING:
-        return handle_ftp_data_connection_snat(packet, skb);
+        return CONTINUE;
     case NF_INET_PRE_ROUTING:
         switch (packet->direction) {
         case DIRECTION_OUT:
@@ -55,87 +55,103 @@ enum proxy_response handle_proxy_packet(packet_t *packet, struct sk_buff *skb,
     case NF_INET_LOCAL_IN:
         break;
     }
-    return UNHANDLED; // This line is never reached
+    return CONTINUE; // This line is never reached
 }
 
 enum proxy_response handle_internal_to_external_packet(packet_t *packet,
                                                        struct sk_buff *skb) {
+    struct tcp_connection_node *conn_node;
     if (packet->dst_port == HTTP_PORT_BE) {
         packet->tcp_header->dest = HTTP_PROXY_PORT_BE;
         packet->ip_header->daddr = FW_INTERNAL_PROXY_IP;
-        fix_checksum(skb, packet->ip_header, packet->tcp_header);
-        return HANDLED;
+        goto fix_checksum_and_continue;
     } else if (packet->dst_port == FTP_CONTROL_PORT_BE) {
         packet->tcp_header->dest = FTP_CONTROL_PROXY_PORT_BE;
         packet->ip_header->daddr = FW_INTERNAL_PROXY_IP;
-        fix_checksum(skb, packet->ip_header, packet->tcp_header);
-        return HANDLED;
+        goto fix_checksum_and_continue;
     } else if (packet->dst_port == SMTP_PORT_BE) {
         packet->tcp_header->dest = SMTP_PROXY_PORT_BE;
         packet->ip_header->daddr = FW_INTERNAL_PROXY_IP;
-        fix_checksum(skb, packet->ip_header, packet->tcp_header);
-        return HANDLED;
+        goto fix_checksum_and_continue;
     } else if (packet->src_port == NIFI_PORT_BE) {
-        // In this case we can assume the packet is sent
-        // as a response to a request made by the proxy
-        return ACCEPT_IMMEDIATELY;
+        conn_node = lookup_tcp_connection_node(
+            (struct socket_address){.addr = packet->dst_ip,
+                                    .port = packet->dst_port},
+            (struct socket_address){.addr = packet->src_ip,
+                                    .port = packet->src_port});
+        if (conn_node == NULL) {
+            return DROP_IMMEDIATELY; // Drop unrelated packet
+        }
+        packet->ip_header->daddr = FW_INTERNAL_PROXY_IP;
+        packet->tcp_header->dest = conn_node->conn.proxy_port;
+        goto fix_checksum_and_continue;
     }
-    return UNHANDLED;
+    return CONTINUE;
+fix_checksum_and_continue:
+    fix_checksum(skb, packet->ip_header, packet->tcp_header);
+    return CONTINUE;
 }
 
 enum proxy_response handle_external_to_internal_packet(packet_t *packet,
                                                        struct sk_buff *skb) {
-    struct socket_address internal_addr;
-    struct socket_address external_addr = {.addr = packet->src_ip,
-                                           .port = packet->src_port};
-
+    struct tcp_connection_node *conn_node;
     if (packet->dst_port == NIFI_PORT_BE) {
-        packet->tcp_header->dest = NIFI_PROXY_PORT_BE;
         packet->ip_header->daddr = FW_EXTERNAL_PROXY_IP;
-        fix_checksum(skb, packet->ip_header, packet->tcp_header);
-        return HANDLED;
-    } else if (packet->src_port == FTP_DATA_PORT_BE) {
-        internal_addr = lookup_peer_address(external_addr);
-        if (internal_addr.addr == 0) {
-            printk(KERN_DEBUG "Dropping unrelated FTP data packet\n");
-            return DROP_IMMEDIATELY;
+        packet->tcp_header->dest = NIFI_PROXY_PORT_BE;
+        goto fix_checksum_and_continue;
+    } else if (packet->src_port == HTTP_PORT_BE ||
+               packet->src_port == SMTP_PORT_BE ||
+               packet->src_port == FTP_CONTROL_PORT_BE) {
+        conn_node = lookup_tcp_connection_node(
+            (struct socket_address){.addr = packet->dst_ip,
+                                    .port = packet->dst_port},
+            (struct socket_address){.addr = packet->src_ip,
+                                    .port = packet->src_port});
+        if (conn_node == NULL) {
+            return DROP_IMMEDIATELY; // Drop unrelated packet
         }
-
-        packet->ip_header->daddr = packet->dst_ip = internal_addr.addr;
-        packet->tcp_header->dest = packet->dst_port = internal_addr.port;
-        fix_checksum(skb, packet->ip_header, packet->tcp_header);
-        return HANDLED;
-    } else if (packet->dst_ip == FW_EXTERNAL_PROXY_IP &&
-               lookup_tcp_connection_by_proxy_port(packet->dst_port) != NULL) {
-        return ACCEPT_IMMEDIATELY;
+        packet->ip_header->daddr = FW_EXTERNAL_PROXY_IP;
+        packet->tcp_header->dest = conn_node->conn.proxy_port;
+        goto fix_checksum_and_continue;
     }
-    return UNHANDLED;
+    return CONTINUE;
+fix_checksum_and_continue:
+    fix_checksum(skb, packet->ip_header, packet->tcp_header);
+    return CONTINUE;
 }
 
 enum proxy_response handle_out_to_external_packet(packet_t *packet,
                                                   struct sk_buff *skb) {
+    struct tcp_connection *conn;
     struct socket_address internal_addr;
     struct socket_address external_addr = {.addr = packet->dst_ip,
                                            .port = packet->dst_port};
 
     if (packet->src_port == NIFI_PROXY_PORT_BE) {
         if ((internal_addr = lookup_peer_address(external_addr)).addr == 0) {
-            printk(KERN_DEBUG "Dropping unrelated packet\n");
             return DROP_IMMEDIATELY;
         }
         packet->src_ip = packet->ip_header->saddr = internal_addr.addr;
         packet->src_port = packet->tcp_header->source = internal_addr.port;
-        fix_checksum(skb, packet->ip_header, packet->tcp_header);
-        return HANDLED;
-    } else if (packet->src_ip == FW_EXTERNAL_PROXY_IP &&
-               lookup_tcp_connection_by_proxy_port(packet->src_port) != NULL) {
-        return ACCEPT_IMMEDIATELY;
+        goto fix_checksum_and_continue;
+    } else if (packet->src_ip == FW_EXTERNAL_PROXY_IP) {
+        if ((conn = lookup_tcp_connection_by_proxy_port(packet->src_port)) ==
+            NULL) {
+            return DROP_IMMEDIATELY; // Drop unrelated packet
+        }
+        packet->ip_header->saddr = packet->src_ip = conn->saddr.addr;
+        packet->tcp_header->source = packet->src_port = conn->saddr.port;
+        goto fix_checksum_and_continue;
     }
-    return UNHANDLED;
+    return CONTINUE;
+fix_checksum_and_continue:
+    fix_checksum(skb, packet->ip_header, packet->tcp_header);
+    return CONTINUE;
 }
 
 enum proxy_response handle_out_to_internal_packet(packet_t *packet,
                                                   struct sk_buff *skb) {
+    struct tcp_connection *conn;
     struct socket_address external_addr;
     struct socket_address internal_addr = {.addr = packet->dst_ip,
                                            .port = packet->dst_port};
@@ -143,28 +159,22 @@ enum proxy_response handle_out_to_internal_packet(packet_t *packet,
         packet->src_port == FTP_CONTROL_PROXY_PORT_BE ||
         packet->src_port == SMTP_PROXY_PORT_BE) {
         if ((external_addr = lookup_peer_address(internal_addr)).addr == 0) {
-            printk(KERN_DEBUG "Dropping unrelated packet\n");
-            return DROP_IMMEDIATELY;
+            return DROP_IMMEDIATELY; // Drop unrelated packet
         }
         packet->src_ip = packet->ip_header->saddr = external_addr.addr;
         packet->src_port = packet->tcp_header->source = external_addr.port;
-        fix_checksum(skb, packet->ip_header, packet->tcp_header);
-        return HANDLED;
+        goto fix_checksum_and_continue;
     } else if (packet->dst_port == NIFI_PORT_BE) {
-        return ACCEPT_IMMEDIATELY;
+        if ((conn = lookup_tcp_connection_by_proxy_port(packet->src_port)) ==
+            NULL) {
+            return DROP_IMMEDIATELY; // Drop unrelated packet
+        }
+        packet->ip_header->saddr = packet->src_ip = conn->saddr.addr;
+        packet->tcp_header->source = packet->src_port = conn->saddr.port;
+        goto fix_checksum_and_continue;
     }
-    return UNHANDLED;
-}
-
-enum proxy_response handle_ftp_data_connection_snat(packet_t *packet,
-                                                    struct sk_buff *skb) {
-    if (packet->direction == DIRECTION_OUT &&
-        packet->dst_port == FTP_DATA_PORT_BE) {
-        packet->ip_header->saddr = FW_EXTERNAL_PROXY_IP;
-        fix_checksum(skb, packet->ip_header, packet->tcp_header);
-        return HANDLED;
-    }
-    return ACCEPT_IMMEDIATELY; // In this case we can safely assume that the
-                               // packet was already accepted by the
-                               // prerouting hook.
+    return CONTINUE;
+fix_checksum_and_continue:
+    fix_checksum(skb, packet->ip_header, packet->tcp_header);
+    return CONTINUE;
 }
