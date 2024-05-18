@@ -36,6 +36,17 @@ The files are blocked according to the HTTP `Content-Type` header.
 In stage 5, we added DLP, for disallowing C source code to be sent from the internal network to the external.
 The DLP works by blocking packets having the `text/x-chdr` and `text/x-csrc` headers, and by blocking packets that can be parsed with our custom [cparser](#c-parser).
 
+#### Testing the HTTP Server
+Install apache2 by running:
+```bash
+sudo apt install -y apache2
+sudo systemctl --now enable apache2
+```
+Then place the files in `/var/www/html`, and access them from the client by running:
+```bash
+curl http://10.1.2.2
+```
+
 
 ### FTP Proxy
 FTP is not very friendly with firewalls...<br/>
@@ -51,12 +62,57 @@ This CVE allows an authenticated and authorized user to configure a database URL
 The protection works by blocking requests to the endpoint `/nifi-api/controller-services`, trying to set a database URL starting with `jdbc:h2`.
 This protection is inspired by the official vulnerability fix that can be found [here](https://github.com/apache/nifi/pull/7349/files).
 
+#### Testing the NiFi Setup
+To test the NiFi setup, I installed from scratch an Ubuntu 22.04 VM for running the NiFi server, and a Kali 2024.1 to act as the NiFi client, running Metasploit.
+Installation steps:
+- Setup IP addresses for both VMs, and make sure they can communicate.
+- Add an `/etc/hosts` entry for nifi.com in the Kali VM.
+- Download NiFi 1.21.0 from [here](https://archive.apache.org/dist/nifi/1.21.0/nifi-1.21.0-bin.zip) to the Ubuntu VM.
+- Extract the downloaded Zip file.
+- cd to the directory.
+- Change the following lines in `conf/nifi.properties`:
+    ```
+    nifi.web.https.host = nifi.com
+    nifi.web.https.network.interface.default = YOUR_INTERFACE_NAME
+    ```
+- Run `bin/nifi.sh install`.
+- Run `systemctl --now enable nifi`.
+
+The official installation steps can be found [here](https://nifi.apache.org/docs/nifi-docs/html/getting-started.html#for-linuxmacos-users).
+
 ### SMTP Proxy
 Implemented in stage 5, the SMTP proxy runs by default on port 250.
 The purpose of this proxy is to block C source code being sent outside to the external network.
 The proxy works by attempting to parse the packet as an SMTP message.
 If the message's body can be parsed with our C parser, the packet is dropped.
 
+#### Testing Sending Emails
+To test sending emails, follow these steps on both hosts:
+- Install the following packages:
+    ```bash
+    sudo apt install -y mailutils mutt postfix
+    ```
+    When installing, an ncruses installation menu for postfix will popup. Just use the default settings, but change the domain names to "client" and "server" on the hosts, respectively.
+
+- Add the following host entries in `/etc/hosts`:
+    ```
+    10.1.1.1 client
+    10.1.2.2 server
+    ```
+
+- Set the following configurations in `/etc/postfix/main.cf`:
+    ```
+    myhostname = client (or server, depending on the host)
+    disable_dns_lookups = yes
+    ```
+
+- Restart postfix:
+    ```bash
+    systemctl restart postfix
+    ```
+
+- Use mutt to send an email from the client to the server, to this address: `fw@server`.
+You can also use mutt to read the emails on the server.
 
 ### C Parser
 In stage 5 we added a DLP protection layer, for blocking C source code being sent outside to the external network, in HTTP and SMTP packets.
