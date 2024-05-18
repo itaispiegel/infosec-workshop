@@ -262,13 +262,18 @@ func connectToServer(clientAddr *net.TCPAddr, serverAddr *net.TCPAddr) (net.Conn
 	}
 
 	proxyPort := uint16(sockAddrInet4.Port)
-	log.Debug().Uint16("proxyPort", proxyPort).Msg("Set proxy port")
 	setProxyPort(clientAddr, serverAddr, proxyPort)
 
 	serverAddrInet4 := &syscall.SockaddrInet4{Port: serverAddr.Port, Addr: [4]byte(serverAddr.IP.To4())}
+	log.Debug().Str("serverAddr", serverAddr.IP.String()).
+		Uint16("proxyPort", proxyPort).
+		Msg("Connecting to server")
 	if err := syscall.Connect(proxyToServerSock, serverAddrInet4); err != nil {
 		return nil, err
 	}
+	log.Debug().Str("serverAddr", serverAddr.IP.String()).
+		Uint16("proxyPort", proxyPort).
+		Msg("Connected to server")
 
 	return net.FileConn(os.NewFile(uintptr(proxyToServerSock), ""))
 }
