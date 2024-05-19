@@ -58,7 +58,6 @@ static unsigned int netfilter_hook_func(void *priv, struct sk_buff *skb,
     }
 
     if (packet.direction == DIRECTION_ANY) {
-        printk(KERN_WARNING "Dropping packet with unknown direction\n");
         return NF_DROP;
     }
 

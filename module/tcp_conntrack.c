@@ -70,6 +70,8 @@ static ssize_t proxy_port_store(struct device *dev,
         return -ENOENT;
     }
 
+    printk(KERN_DEBUG "Setting proxy port to %u conn_node=%p\n",
+           ntohs(proxy_port), conn_node);
     conn_node->conn.proxy_port = proxy_port;
     return expected_count;
 }
@@ -86,13 +88,16 @@ static void *add_connection(struct socket_address saddr,
 
     conn_node->conn = (struct tcp_connection){
         .state = state,
+        .proxy_port = 0, // Set by the userspace
         .saddr = saddr,
         .daddr = daddr,
     };
     hash = hash_conn_addrs(saddr, daddr);
     hash_add(tcp_connections, &conn_node->node, hash);
-    printk(KERN_DEBUG "Tracking new TCP connection %pI4:%u-->%pI4:%u\n",
-           &saddr.addr, ntohs(saddr.port), &daddr.addr, ntohs(daddr.port));
+    printk(KERN_DEBUG
+           "Tracking new TCP connection %pI4:%u-->%pI4:%u in address %p\n",
+           &saddr.addr, ntohs(saddr.port), &daddr.addr, ntohs(daddr.port),
+           conn_node);
     return conn_node;
 }
 
@@ -230,7 +235,7 @@ static void tcp_fsm_step(struct tcp_connection_node *conn_node,
             break;
         case TCP_LAST_ACK:
             if (tcp_header->ack) {
-                close_connection(conn_node);
+                conn->state = TCP_TIME_WAIT;
                 return;
             }
             break;
@@ -303,18 +308,17 @@ struct tcp_connection *lookup_tcp_connection_by_proxy_port(__be16 proxy_port) {
     return NULL;
 }
 
-struct socket_address
-lookup_server_address_by_client_address(struct socket_address client_addr) {
+struct socket_address lookup_peer_address(struct socket_address addr) {
     unsigned i;
     struct tcp_connection_node *conn_node;
-    struct socket_address server_addr = {.addr = 0, .port = 0};
+    struct socket_address peer_addr = {.addr = 0, .port = 0};
     hash_for_each(tcp_connections, i, conn_node, node) {
-        if (conn_node->conn.saddr.addr == client_addr.addr &&
-            conn_node->conn.saddr.port == client_addr.port) {
+        if (conn_node->conn.saddr.addr == addr.addr &&
+            conn_node->conn.saddr.port == addr.port) {
             return conn_node->conn.daddr;
         }
     }
-    return server_addr;
+    return peer_addr;
 }
 
 void track_one_sided_connection(packet_t *packet, direction_t direction) {

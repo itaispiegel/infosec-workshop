@@ -20,12 +20,14 @@ var RootCmd = &cobra.Command{
 }
 
 func Execute() {
-	if !module.IsLoaded() {
-		RootCmd.Println("Error: The firewall kernel module is not loaded.")
+	if err := RootCmd.Execute(); err != nil {
 		os.Exit(1)
 	}
+}
 
-	if err := RootCmd.Execute(); err != nil {
+func ensureKernelModuleLoaded(cmd *cobra.Command, args []string) {
+	if !module.IsLoaded() {
+		RootCmd.Println("Error: The firewall kernel module is not loaded.")
 		os.Exit(1)
 	}
 }

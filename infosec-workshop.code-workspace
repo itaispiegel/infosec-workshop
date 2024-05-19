@@ -8,7 +8,7 @@
         },
         {
             "path": "user"
-        }
+        },
     ],
     "settings": {
         "files.exclude": {
@@ -17,6 +17,7 @@
         },
         "files.associations": {
             "*.h": "c",
+            "random": "c"
         }
     }
 }
