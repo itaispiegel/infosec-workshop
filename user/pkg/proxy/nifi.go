@@ -40,14 +40,8 @@ func detectExploit(req *http.Request) bool {
 		log.Error().Err(err).Msg("Error decoding request body")
 		return false
 	}
-	component, ok := data["component"].(map[string]any)
-	if !ok {
-		return false
-	}
-	properties, ok := component["properties"].(map[string]any)
-	if !ok {
-		return false
-	}
+	component, _ := data["component"].(map[string]any)
+	properties, _ := component["properties"].(map[string]any)
 	databaseUrl, ok := properties["Database Connection URL"].(string)
 	if !ok {
 		return false
