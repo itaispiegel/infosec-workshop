@@ -159,8 +159,10 @@ For example, consider this function defined in [Git's repository](https://github
     Notice the use of the `UNUSED` preprocessing macro.
     Our C parser detects this as an identifier token which is unexpected in this context, and therefore will classify this text as non C code.
 
-- A popular C convention is to define typedefs with the `_t` suffix.
+- Moreover, we it's common to define typedefs for struct and enum types, and then to omit the `struct` and `enum` keywords.
+Our C parser doesn't support this convention, since the typedef's name will be parsed as an identifier which will be unknown.
+On the other hand, a popular convention is to define typedefs with the `_t` suffix.
 Some common typedefs are: `size_t`, `pid_t`, `loff_t`, `time_t`, and etc.
-Since this is so common, I decided to define identifiers ending with `_t` as `TYPEDEF_NAME` tokens, instead of `IDENTIFIER` tokens.
+Since this is so common, I decided to add a heuristic, and to define identifiers ending with `_t` as `TYPEDEF_NAME` tokens, instead of `IDENTIFIER` tokens.
 This means that code such as: `int x_t = 5;` won't parse successfully, as the parser will parse this `IDENTIFIER TYPEDEF_NAME` which is invalid.
 From my oversight, it's uncommon to define variables with this suffix, so it's better to have this tradeoff.
