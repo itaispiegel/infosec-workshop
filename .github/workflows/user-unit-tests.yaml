@@ -20,6 +20,9 @@ jobs:
         with:
           go-version-file: user/go.mod
           cache: false
+      - run: sudo apt install -y bison
+      - run: go generate -v ./...
+        working-directory: user
       - name: Run unit tests
         run: go test -v ./...
         working-directory: user

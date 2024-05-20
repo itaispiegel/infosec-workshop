@@ -24,7 +24,8 @@ func TestParser(t *testing.T) {
 			expectedParserStatus := CParserResult{}
 			parserStatusBytes, err := os.ReadFile(parserStatusPath)
 			assert.NoError(t, err)
-			yaml.Unmarshal(parserStatusBytes, &expectedParserStatus)
+			err = yaml.Unmarshal(parserStatusBytes, &expectedParserStatus)
+			assert.NoError(t, err)
 
 			actualParserStatus := Parse(string(input))
 			assert.Equal(t, expectedParserStatus, actualParserStatus, "Test case '%s' failed", testName)
