@@ -73,3 +73,12 @@ This protocol poses challenges for NATs and Firewalls.
 Fortunately, our application level gateway enables inspecction of PORT packets, allowing seamless passage of FTP data connections.
 Upon establishment of such connections, the proxy writes the addresses to the file `/sys/class/fw/conn/related_conns`, and the kernel module adds the new connection to the table.
 The new connection is considered a "related" session, as evidenced in the logs.
+
+
+## HW5
+This exercise consisted of two parts: implementing an IPS and implementing a DLP.
+In the IPS part - each student received a CVE published in the last year (2023), and had to implement the firewall to protect from exploiting this CVE.
+The CVE I received is [CVE-2023-34468](https://nvd.nist.gov/vuln/detail/CVE-2023-34468), and the implemetation details are described [here](./user/README.md#nifi-proxy).
+
+In the DLP part, we were requested to be able to classify whether a text is C code, and then implement the firewall to block sending C source code outside the network with HTTP and SMTP.
+The implementation details are described [here](./user/README.md#c-parser).
